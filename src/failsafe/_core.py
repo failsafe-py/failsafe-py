@@ -22,6 +22,8 @@ __all__ = [
     "Clock",
     "Execution",
     "FakeClock",
+    "Hedge",
+    "HedgeControl",
     "Instruction",
     "Invoke",
     "Outcome",
@@ -129,6 +131,16 @@ class FakeClock:
         self.sleep(seconds)
 
 
+@dataclass(slots=True)
+class _Counters:
+    """Counts shared by every attempt of one execution, including hedges."""
+
+    attempts: int = 0
+    executions: int = 0
+    retries: int = 0
+    hedges: int = 0
+
+
 class Execution:
     """Information about an execution, shared by every policy layer and attempt.
 
@@ -138,39 +150,97 @@ class Execution:
 
     Attributes are maintained by the core; user code reads them via
     :func:`failsafe.current_execution`.
+
+    Hedged attempts run concurrently against copies of this object: the counts are
+    shared, while the last result and the attempt's start time belong to the attempt.
     """
 
     __slots__ = (
         "_clock",
+        "_counters",
+        "args",
         "attempt_start_time",
-        "attempts",
         "deadline",
-        "executions",
+        "is_hedge",
+        "kwargs",
         "last_exception",
         "last_result",
-        "retries",
         "start_time",
     )
 
     def __init__(self, clock: Clock = SYSTEM_CLOCK, deadline: float | None = None) -> None:
         now = clock.now()
         self._clock = clock
+        self._counters = _Counters()
         self.start_time = now
         """The time the execution began, on the configured clock."""
         self.attempt_start_time = now
         """The time the most recent attempt began."""
         self.deadline = deadline
         """The absolute time by which the execution must finish, if any."""
-        self.attempts = 0
-        """Attempts started so far, including ones blocked before reaching the function."""
-        self.executions = 0
-        """Attempts that reached the function and completed."""
-        self.retries = 0
-        """Attempts after the first."""
+        self.is_hedge = False
+        """Whether this attempt is a hedge rather than the initial attempt."""
+        self.args: tuple[Any, ...] = ()
+        """The positional arguments the execution was called with."""
+        self.kwargs: dict[str, Any] = {}
+        """The keyword arguments the execution was called with."""
         self.last_result: Any = None
         """The value from the most recent completed attempt."""
         self.last_exception: Exception | None = None
         """The exception from the most recent completed attempt."""
+
+    @property
+    def attempts(self) -> int:
+        """Attempts started so far, including ones blocked before reaching the function."""
+        return self._counters.attempts
+
+    @attempts.setter
+    def attempts(self, value: int) -> None:
+        self._counters.attempts = value
+
+    @property
+    def executions(self) -> int:
+        """Attempts that reached the function and completed."""
+        return self._counters.executions
+
+    @executions.setter
+    def executions(self, value: int) -> None:
+        self._counters.executions = value
+
+    @property
+    def retries(self) -> int:
+        """Attempts after the first that were started by a retry, not a hedge."""
+        return self._counters.retries
+
+    @retries.setter
+    def retries(self, value: int) -> None:
+        self._counters.retries = value
+
+    @property
+    def hedges(self) -> int:
+        """Hedged attempts started so far, including ones still running."""
+        return self._counters.hedges
+
+    def copy_for_hedge(self) -> Execution:
+        """Return a copy for a hedged attempt, counting it as an attempt and a hedge.
+
+        The copy shares this execution's counts and start time, so every attempt sees
+        the same totals, but carries its own last result and attempt start time.
+        """
+        copy = object.__new__(Execution)
+        copy._clock = self._clock
+        copy._counters = self._counters
+        copy.start_time = self.start_time
+        copy.attempt_start_time = self._clock.now()
+        copy.deadline = self.deadline
+        copy.is_hedge = True
+        copy.args = self.args
+        copy.kwargs = self.kwargs
+        copy.last_result = None
+        copy.last_exception = None
+        self._counters.attempts += 1
+        self._counters.hedges += 1
+        return copy
 
     @property
     def elapsed(self) -> float:
@@ -282,7 +352,50 @@ class Race:
     interrupt: bool = False
 
 
-Instruction = Invoke | Sleep | Acquire | Race
+class HedgeControl(Protocol):
+    """What the drivers need from a hedge policy to run concurrent attempts.
+
+    Keeps the policy's configuration — delays, cancellation conditions, budget — out
+    of the core while leaving the concurrency to the driver.
+    """
+
+    def hedge_delay(self, ex: Execution) -> float | None:
+        """Seconds to wait before starting another attempt, or ``None`` to stop."""
+        ...
+
+    def accepts(self, outcome: Outcome[Any]) -> bool:
+        """Whether ``outcome`` should win and cancel the attempts still running."""
+        ...
+
+    def start_hedge(self, ex: Execution) -> bool:
+        """Admit a hedged attempt, returning ``False`` to stop hedging."""
+        ...
+
+    def finish_hedge(self) -> None:
+        """Release whatever :meth:`start_hedge` admitted."""
+        ...
+
+    def record_duration(self, ex: Execution) -> None:
+        """Record how long one accepted attempt took."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class Hedge:
+    """Run ``inner`` concurrently against itself, returning the first accepted outcome.
+
+    Attempts start one at a time: each is given a delay to finish before the next
+    joins it. The first outcome ``control`` accepts wins and the rest are cancelled
+    for real, which only asyncio can do, so the sync driver rejects this instruction.
+
+    Sent back to the policy as the winning :class:`Outcome`.
+    """
+
+    inner: Any
+    control: HedgeControl
+
+
+Instruction = Invoke | Sleep | Acquire | Race | Hedge
 """Anything a policy may yield to a driver."""
 
 Step = Callable[[Execution], Generator[Instruction, Any, Outcome[Any]]]
@@ -303,10 +416,12 @@ class Policy(Protocol):
 
 def _attempt(ex: Execution) -> Generator[Instruction, Any, Outcome[Any]]:
     """The innermost step: one attempt, with its bookkeeping."""
-    ex.attempts += 1
-    if ex.attempts > 1:
-        ex.retries += 1
-        ex.attempt_start_time = ex._clock.now()
+    # A hedge copy already counted itself and set its own start time.
+    if not ex.is_hedge:
+        ex.attempts += 1
+        if ex.attempts > 1:
+            ex.retries += 1
+            ex.attempt_start_time = ex._clock.now()
     outcome: Outcome[Any] = yield INVOKE
     ex.executions += 1
     ex.last_result = outcome.value

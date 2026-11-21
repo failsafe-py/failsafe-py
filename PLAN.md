@@ -46,9 +46,14 @@ t-digest; the replacement is a sorted window.
 
 **Corrected at phase 5.** Earlier drafts of this section offered `util.MovingQuantile` as the
 replacement. That is the wrong structure: `MovingQuantile` is a *windowless* estimator used by
-`hedgepolicy` (phase 6), and nothing in `adaptivelimiter` touches it. The limiter resets its
+`hedgepolicy`, and nothing in `adaptivelimiter` touches it. The limiter resets its
 t-digest on every limit update, so it is a *batch* quantile over one window's samples —
 `recentWindowMinSamples` defaults to 50.
+
+**Confirmed at phase 6.** `MovingQuantile` was ported verbatim for `HedgePolicy`'s adaptive
+delay, and the limiter still uses the sorted window. The two estimators coexist because they
+answer different questions: the limiter wants an exact quantile over a bounded batch, the hedge
+policy wants an O(1) estimate over an unbounded stream.
 
 The accuracy claim was then measured rather than asserted, running Go's own `influxdata/tdigest`
 against an exact p90 over lognormal samples, 200 trials per size:
@@ -187,9 +192,9 @@ Counted from the Go builder interfaces, including inherited methods:
 | CircuitBreaker | 23 | 11 | **5** |
 | AdaptiveLimiter | 14 | 11 | **9** |
 | AdaptiveThrottler | 8 | 6 | **4** |
-| HedgePolicy | 7 | 5 | **4** |
+| HedgePolicy | 7 | 5 | **7** |
 | Fallback | 7 | 5 | **3** |
-| CachePolicy | 5 | 5 | **2** |
+| CachePolicy | 5 | 5 | **3** |
 | Bulkhead | 4 | 4 | **1** |
 | RateLimiter | 2 | 2 | **1** |
 | Timeout | 1 | 1 | **1** |
@@ -381,6 +386,11 @@ into caller-visible latency.
 A thread-pool version would ship weaker-than-Go semantics (uncancellable losers) under the same
 policy name. This is the one capability gap versus failsafe-go.
 
+**Held at phase 6.** Implemented as written: the sync driver raises `NotImplementedError` on the
+`Hedge` instruction, and `tests/test_hedge.py` pins that losing attempts observe a real
+`CancelledError`. Concurrency lives entirely in the async driver, behind a `HedgeControl`
+protocol that keeps delays, cancellation conditions and the budget in the policy.
+
 ### D-9 — No async execution handle
 
 `RunAsync` / `ExecutionResult` are dropped. Go needs them because goroutines have no first-class
@@ -564,6 +574,21 @@ No async variant is provided. The calibration body is pure CPU over in-memory co
 awaits, so an asyncio user can call `calibrate()` from their own `asyncio.TaskGroup` loop and
 needs nothing from us to do it.
 
+### D-19 — The hedge quantile times attempts, not executions
+
+Found at phase 6 by reading `hedgeexecutor.go` rather than the doc page. Go starts its timer
+*inside* each goroutine and records `time.Since(startTime)` for that attempt alone, and only
+when the outcome is acceptable.
+
+Recording the hedged execution's total elapsed time instead is a feedback loop: a hedged
+execution spans the stalled primary *plus* the winning attempt, so every hedge teaches the
+estimate a larger number, the delay grows, and the policy hedges less and less — exactly when
+the tail is worst. The first implementation here had that bug; the regression test
+`test_the_quantile_times_each_attempt_not_the_whole_execution` fails if it returns.
+
+This is why `_hedged_attempt` returns `(outcome, execution)` rather than just the outcome: the
+winning attempt's own `elapsed_attempt` is not recoverable from the parent execution.
+
 ---
 
 ## 6. Public API
@@ -670,7 +695,7 @@ Failsafe.call(fn)
           Sleep(d)     → time.sleep | asyncio.sleep      (interruptible by cancellation)
           Acquire(...) → FifoSemaphore.acquire{,_async}  (one instance serves both modes)
           Race(g, t)   → worker thread + timer | asyncio.timeout
-          Hedge(...)   → TaskGroup (async only)
+          Hedge(...)   → concurrent tasks + asyncio.wait (async only; losers cancelled)
      └─ unwrap the final Outcome: return value or raise
 ```
 
@@ -809,7 +834,7 @@ Go uses `testing/synctest` for a virtual clock; the equivalent here is an inject
 | 3 | `RateLimiter`, `Bulkhead`, `failsafe.httpx` client | **done** — Go's rate limiter and bulkhead corpora ported, body rewind pinned by mutation test |
 | 4 | `failsafe-py.dev` site + API reference on Read the Docs | **deferred** — skipped at the user's call; nothing in phase 5 depended on it |
 | 5 | `AdaptiveLimiter`, `priority`, prioritized variants | **done** — Go's limiter, priority and prioritizer corpora ported; quantile claim measured, not assumed |
-| 6 | `HedgePolicy` (async only), `CachePolicy`, `Budget` | planned |
+| 6 | `HedgePolicy` (async only), `CachePolicy`, `Budget` | **done** — Go's hedge, cache and budget corpora ported; per-attempt quantile timing pinned by mutation test |
 | 7 | Server-side HTTP: ASGI middleware, priority headers | post-`1.0` |
 | — | gRPC | out of scope |
 
@@ -818,6 +843,11 @@ depended on it. Port the `failsafe-go.dev` structure page-for-page; the layout i
 examples translate almost 1:1. Includes the Go→Python mapping page and the deviations from
 `PORT.md`. failsafe and failsafe-go have *different* logos, so failsafe-py gets its own variation
 in Python's palette rather than reusing either.
+
+**The source pages are not all current.** `execution-budgets.md` advertises `RetryRate` and
+`HedgeRate` metrics that the Go `Budget` interface does not declare at the revision ported
+here — it has a single combined `Rate()`. Verify each page against the Go source rather than
+translating it, and expect more of these.
 
 **Repos:** two — code and docs separate, mirroring the `failsafe-go` / `failsafe-go.dev` split.
 

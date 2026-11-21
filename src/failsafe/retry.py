@@ -11,7 +11,8 @@ from ._conditions import Condition, FailureConditions
 from ._core import Execution, Instruction, Outcome, Sleep, Step
 from ._delays import Delay, compile_delay, seconds
 from ._events import ExecutionEvent, Listener, Listeners, ScheduledRetryEvent
-from ._exceptions import RetriesExceeded
+from ._exceptions import BudgetExceeded, RetriesExceeded
+from .budget import Budget
 
 __all__ = ["RetryPolicy"]
 
@@ -50,6 +51,10 @@ class RetryPolicy:
             began. Delays are clamped so a long backoff never overshoots it.
         return_last_failure: Raise or return the last failure itself rather than
             wrapping it in :exc:`~failsafe.RetriesExceeded`.
+        budget: A :class:`~failsafe.Budget` limiting what share of in-flight work
+            retries may become. Share one instance across the policies guarding the
+            same dependency. Retries refused by the budget fail with
+            :exc:`~failsafe.BudgetExceeded`.
         on_retry: Called after each delay, before the next attempt.
         on_retry_scheduled: Called before each delay, with the delay about to elapse.
         on_retries_exceeded: Called once when the limits are reached.
@@ -68,6 +73,7 @@ class RetryPolicy:
         "_delay",
         "_handle",
         "_rng",
+        "budget",
         "max_duration",
         "max_retries",
         "on_abort",
@@ -88,6 +94,7 @@ class RetryPolicy:
         max_retries: int | None = 2,
         max_duration: float | timedelta | None = None,
         return_last_failure: bool = False,
+        budget: Budget | None = None,
         on_retry: Listener | Sequence[Listener] | None = None,
         on_retry_scheduled: Listener | Sequence[Listener] | None = None,
         on_retries_exceeded: Listener | Sequence[Listener] | None = None,
@@ -110,6 +117,8 @@ class RetryPolicy:
         """Seconds after which no further retry is started."""
         self.return_last_failure = return_last_failure
         """Whether the last failure is returned rather than wrapped."""
+        self.budget = budget
+        """The shared retry budget, if any."""
         self.on_retry = Listeners("on_retry", on_retry)
         """Listeners called after each delay, before the next attempt."""
         self.on_retry_scheduled = Listeners("on_retry_scheduled", on_retry_scheduled)
@@ -134,50 +143,71 @@ class RetryPolicy:
             # Per-execution state, deliberately local: the policy object is shared.
             next_delay = compile_delay(self._delay, self._rng)
             failures = 0
+            budget = self.budget
+            holding = False
+            if budget is not None:
+                budget.record_execution()
+            try:
+                while True:
+                    outcome = yield from inner(ex)
+                    if budget is not None and holding:
+                        budget.release_permit()
+                        holding = False
 
-            while True:
-                outcome = yield from inner(ex)
-
-                if not self.is_failure(outcome):
-                    if self.on_success:
-                        self.on_success.emit(_event(ex, outcome))
-                    return outcome
-
-                if self.on_failure:
-                    self.on_failure.emit(_event(ex, outcome))
-
-                failures += 1
-                # Go compares elapsed > max_duration, but clamping the delay lands
-                # elapsed exactly on the budget, so a strict compare never trips on a
-                # deterministic clock and the loop spins. >= is the same bound.
-                exceeded = (self.max_retries is not None and failures > self.max_retries) or (
-                    self.max_duration is not None and ex.elapsed >= self.max_duration
-                )
-                aborted = self._abort is not None and self._abort(outcome.value, outcome.exc)
-
-                # Both listeners may fire, but an exceeded policy still wraps, matching
-                # Go's OnFailure: abort decides whether to stop, not what is returned.
-                if aborted and self.on_abort:
-                    self.on_abort.emit(_event(ex, outcome))
-                if exceeded and not aborted and self.on_retries_exceeded:
-                    self.on_retries_exceeded.emit(_event(ex, outcome))
-
-                if exceeded:
-                    if self.return_last_failure:
+                    if not self.is_failure(outcome):
+                        if self.on_success:
+                            self.on_success.emit(_event(ex, outcome))
                         return outcome
-                    return Outcome(exc=_exceeded(outcome))
-                if aborted:
-                    return outcome
 
-                delay = self._clamp(next_delay(ex), ex)
-                if self.on_retry_scheduled:
-                    self.on_retry_scheduled.emit(
-                        ScheduledRetryEvent(ex, outcome.value, outcome.exc, delay)
+                    if self.on_failure:
+                        self.on_failure.emit(_event(ex, outcome))
+
+                    failures += 1
+                    # Go compares elapsed > max_duration, but clamping the delay lands
+                    # elapsed exactly on the budget, so a strict compare never trips on a
+                    # deterministic clock and the loop spins. >= is the same bound.
+                    exceeded = (self.max_retries is not None and failures > self.max_retries) or (
+                        self.max_duration is not None and ex.elapsed >= self.max_duration
                     )
-                if delay > 0:
-                    yield Sleep(delay)
-                if self.on_retry:
-                    self.on_retry.emit(_event(ex, outcome))
+                    aborted = self._abort is not None and self._abort(outcome.value, outcome.exc)
+
+                    # Both listeners may fire, but an exceeded policy still wraps, matching
+                    # Go's OnFailure: abort decides whether to stop, not what is returned.
+                    if aborted and self.on_abort:
+                        self.on_abort.emit(_event(ex, outcome))
+                    if exceeded and not aborted and self.on_retries_exceeded:
+                        self.on_retries_exceeded.emit(_event(ex, outcome))
+
+                    if exceeded:
+                        if self.return_last_failure:
+                            return outcome
+                        return Outcome(exc=_exceeded(outcome))
+                    if aborted:
+                        return outcome
+
+                    delay = self._clamp(next_delay(ex), ex)
+                    if self.on_retry_scheduled:
+                        self.on_retry_scheduled.emit(
+                            ScheduledRetryEvent(ex, outcome.value, outcome.exc, delay)
+                        )
+                    if delay > 0:
+                        yield Sleep(delay)
+
+                    # Checked after the delay, as Go does: a budget that frees up while
+                    # this execution waits still permits the retry.
+                    if budget is not None:
+                        if not budget.try_acquire_permit():
+                            budget.notify_exceeded(ex, "retry")
+                            return Outcome(exc=_budget_exceeded(budget, outcome))
+                        holding = True
+
+                    if self.on_retry:
+                        self.on_retry.emit(_event(ex, outcome))
+            finally:
+                if budget is not None:
+                    if holding:
+                        budget.release_permit()
+                    budget.release_execution()
 
         return step
 
@@ -195,5 +225,11 @@ def _event(ex: Execution, outcome: Outcome[Any]) -> ExecutionEvent:
 def _exceeded(outcome: Outcome[Any]) -> RetriesExceeded:
     exceeded = RetriesExceeded(outcome.value, outcome.exc)
     # Chain the real cause so the traceback survives, as `raise ... from` would.
+    exceeded.__cause__ = outcome.exc
+    return exceeded
+
+
+def _budget_exceeded(budget: Budget, outcome: Outcome[Any]) -> BudgetExceeded:
+    exceeded = BudgetExceeded(budget.rate, budget.max_rate)
     exceeded.__cause__ = outcome.exc
     return exceeded

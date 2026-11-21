@@ -12,6 +12,7 @@ from ._core import (
     Acquire,
     Clock,
     Execution,
+    Hedge,
     Instruction,
     Invoke,
     Outcome,
@@ -70,6 +71,8 @@ class AsyncFailsafe:
             Exception: Whatever the final attempt or the policies produce.
         """
         ex = Execution(self._clock)
+        ex.args = args
+        ex.kwargs = kwargs
         token = set_current_execution(ex)
         try:
             outcome = await self._pump(self._chain(ex), ex, fn, args, kwargs)
@@ -137,7 +140,110 @@ class AsyncFailsafe:
             return await instruction.semaphore.acquire_async(instruction.timeout)
         if type(instruction) is Race:
             return await self._race(instruction, ex, fn, args, kwargs)
+        if type(instruction) is Hedge:
+            return await self._hedge(instruction, ex, fn, args, kwargs)
         raise AssertionError(f"unknown instruction {instruction!r}")
+
+    async def _hedge(
+        self,
+        hedge: Hedge,
+        ex: Execution,
+        fn: Callable[..., Awaitable[R]],
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+    ) -> Outcome[Any]:
+        """Run concurrent attempts, returning the first the policy accepts.
+
+        Attempts start one at a time: each is given its delay to finish before the
+        next joins it. Losers are cancelled once a winner is accepted, so their I/O
+        stops rather than running on in the background. When no attempt is ever
+        accepted, the last one to finish is returned.
+        """
+        control = hedge.control
+        pending: set[asyncio.Task[tuple[Outcome[Any], Execution]]] = set()
+        hedged: set[asyncio.Task[tuple[Outcome[Any], Execution]]] = set()
+        last: Outcome[Any] | None = None
+        started = 0
+        more = True
+        try:
+            while True:
+                if more:
+                    attempt_ex = ex if started == 0 else ex.copy_for_hedge()
+                    started += 1
+                    task = asyncio.ensure_future(
+                        self._hedged_attempt(hedge.inner, attempt_ex, fn, args, kwargs)
+                    )
+                    pending.add(task)
+                    if attempt_ex.is_hedge:
+                        hedged.add(task)
+                    delay = control.hedge_delay(ex)
+                    more = delay is not None and control.start_hedge(ex)
+                else:
+                    delay = None
+
+                timer = (
+                    asyncio.ensure_future(self._clock.sleep_async(delay))
+                    if more and delay is not None
+                    else None
+                )
+                try:
+                    while pending:
+                        waits: set[asyncio.Future[Any]] = set(pending)
+                        if timer is not None:
+                            waits.add(timer)
+                        await asyncio.wait(waits, return_when=asyncio.FIRST_COMPLETED)
+                        for task in [t for t in pending if t.done()]:
+                            pending.discard(task)
+                            if task in hedged:
+                                hedged.discard(task)
+                                control.finish_hedge()
+                            last, finished_ex = task.result()
+                            accepted = control.accepts(last)
+                            # Go times each attempt inside its own goroutine, and only
+                            # an acceptable outcome teaches the estimate anything.
+                            if accepted:
+                                control.record_duration(finished_ex)
+                                return self._won(ex, last)
+                        if timer is not None and timer.done():
+                            break
+                finally:
+                    if timer is not None and not timer.done():
+                        timer.cancel()
+                if not pending and not more:
+                    # Nothing left to wait for and nothing acceptable arrived.
+                    assert last is not None
+                    return self._won(ex, last)
+        finally:
+            for task in pending:
+                task.cancel()
+            if pending:
+                await asyncio.gather(*pending, return_exceptions=True)
+            for _ in hedged:
+                control.finish_hedge()
+
+    async def _hedged_attempt(
+        self,
+        inner: Any,
+        attempt_ex: Execution,
+        fn: Callable[..., Awaitable[R]],
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+    ) -> tuple[Outcome[Any], Execution]:
+        """Pump one hedged attempt, with its own execution visible to user code.
+
+        Returns the attempt's execution alongside its outcome so the policy can time
+        that attempt rather than the hedged execution as a whole.
+        """
+        set_current_execution(attempt_ex)
+        outcome = await self._pump(inner(attempt_ex), attempt_ex, fn, args, kwargs)
+        return outcome, attempt_ex
+
+    @staticmethod
+    def _won(ex: Execution, outcome: Outcome[Any]) -> Outcome[Any]:
+        """Record the winning attempt's outcome on the parent execution."""
+        ex.last_result = outcome.value
+        ex.last_exception = outcome.exc
+        return outcome
 
     async def _race(
         self,

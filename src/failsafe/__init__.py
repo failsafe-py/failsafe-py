@@ -14,6 +14,7 @@ from ._events import (
     StateChangedEvent,
 )
 from ._exceptions import (
+    BudgetExceeded,
     BulkheadFull,
     CircuitBreakerOpen,
     FailsafeError,
@@ -27,9 +28,12 @@ from ._prioritizer import Prioritizer, ThresholdChangedEvent
 from ._sync import Failsafe
 from .adaptive_limiter import AdaptiveLimiter, LimitChangedEvent, queue_prioritizer
 from .adaptive_throttler import AdaptiveThrottler, throttle_prioritizer
+from .budget import Budget, BudgetExceededEvent
 from .bulkhead import Bulkhead
+from .cache import Cache, CachePolicy
 from .circuit_breaker import CircuitBreaker, Rate, Ratio
 from .fallback import Fallback
+from .hedge import HedgePolicy
 from .priority import (
     LevelTracker,
     Priority,
@@ -49,8 +53,13 @@ __all__ = [
     "AdaptiveThrottler",
     "AsyncFailsafe",
     "Backoff",
+    "Budget",
+    "BudgetExceeded",
+    "BudgetExceededEvent",
     "Bulkhead",
     "BulkheadFull",
+    "Cache",
+    "CachePolicy",
     "CircuitBreaker",
     "CircuitBreakerOpen",
     "Condition",
@@ -62,6 +71,7 @@ __all__ = [
     "FailsafeError",
     "Fallback",
     "Fixed",
+    "HedgePolicy",
     "Jitter",
     "LevelTracker",
     "LimitChangedEvent",

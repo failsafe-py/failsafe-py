@@ -13,6 +13,7 @@ from ._core import (
     Acquire,
     Clock,
     Execution,
+    Hedge,
     Instruction,
     Invoke,
     Outcome,
@@ -76,6 +77,8 @@ class Failsafe:
             Exception: Whatever the final attempt or the policies produce.
         """
         ex = Execution(self._clock)
+        ex.args = args
+        ex.kwargs = kwargs
         token = set_current_execution(ex)
         try:
             return self._pump(self._chain(ex), ex, fn, args, kwargs).unwrap()
@@ -156,6 +159,12 @@ class Failsafe:
             return instruction.semaphore.acquire(instruction.timeout)
         if type(instruction) is Race:
             return self._race(instruction, ex, fn, args, kwargs, deadline)
+        if type(instruction) is Hedge:
+            raise NotImplementedError(
+                "HedgePolicy requires AsyncFailsafe: cancelling a losing attempt is "
+                "impossible for a synchronous call, and leaving it running would be a "
+                "weaker policy than the name promises"
+            )
         raise AssertionError(f"unknown instruction {instruction!r}")
 
     def _race(

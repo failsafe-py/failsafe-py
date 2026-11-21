@@ -111,6 +111,44 @@ start at the documentation site.
     straight over, which was correct only at a fixed size. With the limiter resizing the
     semaphore downward, that would have pinned `used` above `size` indefinitely.
 
+31. **Hedge delays are a single `delay=` parameter, not four constructors.** Go has
+    `NewWithDelay`, `NewWithDelayFunc`, `NewWithDelayQuantile` and a builder for each. One
+    keyword takes seconds, a timedelta or a callable, and `quantile=` selects the adaptive
+    form; the two are mutually exclusive and the constructor says so.
+32. **A hedge delay of `None` stops hedging, where Go uses a negative duration.** Go's
+    `DelayFunc` returns `-1` as its sentinel. A negative delay has no meaning here, and
+    `None` cannot be produced by arithmetic accident.
+33. **`cancel_on=` takes the same `Condition` as `handle=` and `abort=`.** Go's hedge builder
+    has its own `CancelOnResult` / `CancelOnErrors` / `CancelOnErrorTypes` / `CancelIf` family.
+34. **Hedge warmup is explicit as `warmup=`, defaulting to 20.** Go calls it
+    `executionThreshold` and requires it positionally alongside the quantile.
+35. **`Budget` exposes `max_rate` and `min_concurrency` as constructor keywords**, where Go
+    builds them through `WithMaxRate` / `WithMinConcurrency`. The defaults match Go's `.2`
+    and `3`.
+36. **A budget-refused retry raises `BudgetExceeded`; a budget-refused hedge simply stops
+    hedging.** This mirrors Go, where the retry executor returns `budget.ErrExceeded` while
+    the hedge executor leaves the inflight attempts to produce a result. Worth stating
+    because the same budget produces two different outcomes depending on the policy.
+37. **`Cache` is a structural protocol with `get` returning `(value, found)`.** Go's
+    `Cache[R]` interface returns the same pair. A `dict`-shaped object satisfies it without
+    importing anything from this library.
+38. **Hedged attempts share their execution's counters but carry their own last result.**
+    Go copies the execution per hedge, sharing atomics for the counts. `Execution.hedges` and
+    `Execution.is_hedge` are the Python equivalents of `Hedges()` and `IsHedge()`.
+39. **A hedge counts as an attempt but never as a retry.** Go's `CopyForHedge` increments
+    `attempts` and `hedges` only, leaving `retries` alone, so an outer retry's limit is not
+    consumed by concurrent attempts.
+40. **An acceptable result always beats an expired hedge delay.** Go selects between the delay
+    timer and the result channel, so when both are ready it picks arbitrarily and may start a
+    hedge it no longer needs. The driver checks completed attempts first, which is
+    deterministic and starts strictly fewer duplicate requests.
+41. **`Budget` exposes one combined `rate`, not separate retry and hedge rates.** The
+    `failsafe-go.dev` budgets page advertises `RetryRate` and `HedgeRate` metrics, but the Go
+    `Budget` interface at the ported revision declares a single `Rate()`, documented there as
+    "the current combined rate of retries and hedges". The docs page is stale against its own
+    source; this port follows the source. The `kind` on `BudgetExceededEvent` is what tells
+    retries and hedges apart.
+
 ## One hazard worth stating plainly
 
 Stateful policies model the health of a **backend**, not of a call site. Construct them once and

@@ -134,7 +134,7 @@ class Listeners:
         """Register ``listener`` and return it, so this doubles as a decorator.
 
         Example:
-            >>> @retry.on_retry
+            >>> @retry.on_retry.add
             ... def log_retry(event):
             ...     log.warning("attempt %d failed", event.attempts)
         """

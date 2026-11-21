@@ -15,6 +15,7 @@ __all__ = [
     "MaxWindow",
     "MovingAverage",
     "MovingMedian",
+    "MovingQuantile",
     "QuantileWindow",
     "log10_step",
     "smooth",
@@ -112,6 +113,69 @@ class MovingMedian:
     def reset(self) -> None:
         """Empty the window."""
         self._values.clear()
+
+
+class MovingQuantile:
+    """A streaming quantile estimate, as Go's ``util.MovingQuantile``.
+
+    The Windowless Moving Percentile algorithm: O(1) in time and space, holding no
+    samples. The estimate steps toward each new sample by a fraction of the running
+    standard deviation, so it tracks a shifting distribution rather than averaging
+    over all history.
+
+    Distinct from :class:`QuantileWindow`, which keeps its samples and is exact.
+    This one is for the hedge policy, where samples arrive without bound and only
+    the current estimate matters.
+
+    Args:
+        quantile: The quantile to estimate, between 0 and 1 exclusive.
+        r: The step ratio applied to the standard deviation.
+        age: How many samples the estimate effectively remembers. Smaller ages adapt
+            faster; larger ages are steadier.
+    """
+
+    __slots__ = ("_alpha", "_mean", "_quantile", "_r", "_variance", "count", "value")
+
+    def __init__(self, quantile: float, r: float, age: int) -> None:
+        self._quantile = quantile
+        self._r = r
+        self._alpha = 2 / (age + 1)
+        self._mean = 0.0
+        self._variance = 0.0
+        self.count = 0
+        """How many samples have been added."""
+        self.value = 0.0
+        """The current quantile estimate."""
+
+    def add(self, sample: float) -> float:
+        """Add a sample and return the updated estimate."""
+        self.count += 1
+        if self.count == 1:
+            self.value = sample
+            self._mean = sample
+            return self.value
+
+        old_mean = self._mean
+        self._mean = smooth(self._mean, sample, self._alpha)
+        self._variance = smooth(
+            self._variance, (sample - old_mean) * (sample - self._mean), self._alpha
+        )
+
+        delta = math.sqrt(self._variance) * self._r
+        if delta == 0:
+            return self.value
+        if sample < self.value:
+            self.value -= delta / self._quantile
+        elif sample > self.value:
+            self.value += delta / (1 - self._quantile)
+        return self.value
+
+    def reset(self) -> None:
+        """Clear the estimate and the sample count."""
+        self._mean = 0.0
+        self._variance = 0.0
+        self.count = 0
+        self.value = 0.0
 
 
 class QuantileWindow:

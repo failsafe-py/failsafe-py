@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 __all__ = [
+    "BudgetExceeded",
     "BulkheadFull",
     "CircuitBreakerOpen",
     "FailsafeError",
@@ -125,3 +126,21 @@ class LimitExceeded(FailsafeError):
     def __init__(self, limit: int = 0) -> None:
         super().__init__(f"concurrency limit exceeded (limit: {limit})")
         self.limit = limit
+
+
+class BudgetExceeded(FailsafeError):
+    """A :class:`~failsafe.Budget` refused a retry.
+
+    Raised instead of the last failure: the attempt was never made, so there is no
+    later result to report. The failure that prompted the retry is chained as
+    ``__cause__`` when it was an exception.
+
+    Attributes:
+        rate: The rate of retries and hedges when the budget refused the attempt.
+        max_rate: The rate the budget allows.
+    """
+
+    def __init__(self, rate: float = 0.0, max_rate: float = 0.0) -> None:
+        super().__init__(f"budget exceeded (rate: {rate:.2f}, max rate: {max_rate:.2f})")
+        self.rate = rate
+        self.max_rate = max_rate
