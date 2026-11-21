@@ -3,7 +3,7 @@
 Go spreads these across seven builder methods (``WithDelay``, ``WithDelayFunc``,
 ``WithBackoff``, ``WithBackoffFactor``, ``WithRandomDelay``, ``WithJitter``,
 ``WithJitterFactor``). One parameter taking one of a few small types replaces all of
-them (D-1, D-6).
+them.
 
 Jitter is an attribute of a delay rather than a top-level setting, because Go's own
 docs note that jitter is ignored when no delay is configured: a top-level ``jitter=``
@@ -182,8 +182,7 @@ def compile_delay(
 
     The returned function closes over whatever per-execution state the strategy needs
     (a backoff's current value), so callers must build a fresh one per execution rather
-    than per policy: shared policies must not share backoff state (PLAN section 8
-    item 3).
+    than per policy: shared policies must not share backoff state.
 
     Args:
         delay: The configured delay, or ``None`` for no delay.

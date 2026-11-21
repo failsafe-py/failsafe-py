@@ -5,6 +5,7 @@ from __future__ import annotations
 import random
 import threading
 from collections.abc import Generator, Sequence
+from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 
@@ -13,9 +14,11 @@ from ._core import SYSTEM_CLOCK, Clock, Execution, Instruction, Outcome, Step
 from ._delays import seconds
 from ._events import ExecutionEvent, Listener, Listeners
 from ._exceptions import ThrottleExceeded
+from ._prioritizer import Prioritizer, Stats
 from ._stats import TimedStats
+from .priority import LevelTracker, Priority, UsageTracker
 
-__all__ = ["AdaptiveThrottler"]
+__all__ = ["AdaptiveThrottler", "throttle_prioritizer"]
 
 _BUCKETS = 20
 """Go's adaptivethrottler bucket count, twice the circuit breaker's."""
@@ -53,6 +56,62 @@ def _compute_rejection_rate(
     return min(excess / (executions + _EXECUTION_PADDING), max_rejection_rate)
 
 
+@dataclass(frozen=True, slots=True)
+class _ThrottlerStats:
+    """A throttler's recent rejection pressure, as reported to a prioritizer."""
+
+    executions: float
+    rejection_rate: float
+    max_rejection_rate: float
+
+    def compute_rejection_rate(self) -> float:
+        """The rejection rate, never above the throttler's ceiling."""
+        return min(self.rejection_rate, self.max_rejection_rate)
+
+
+class _ThrottlerRejectionStrategy:
+    """Averages rejection rates across throttlers, weighted by execution count."""
+
+    def combine(self, stats: Sequence[Stats]) -> _ThrottlerStats:
+        """Weight each throttler's rate by how much traffic it actually saw."""
+        if not stats:
+            return _ThrottlerStats(0.0, 0.0, 0.0)
+        total_executions = 0.0
+        weighted = 0.0
+        min_max_rate = 1.0
+        for entry in stats:
+            assert isinstance(entry, _ThrottlerStats)
+            total_executions += entry.executions
+            weighted += entry.rejection_rate * entry.executions
+            min_max_rate = min(min_max_rate, entry.max_rejection_rate)
+        rate = weighted / total_executions if total_executions > 0 else 0.0
+        return _ThrottlerStats(total_executions, rate, min_max_rate)
+
+
+def throttle_prioritizer(
+    *,
+    level_tracker: LevelTracker | None = None,
+    usage_tracker: UsageTracker | None = None,
+    on_threshold_changed: Listener | Sequence[Listener] | None = None,
+) -> Prioritizer:
+    """Create a :class:`~failsafe._prioritizer.Prioritizer` driven by throttler failures.
+
+    Args:
+        level_tracker: Where accepted levels are recorded. Shared if given.
+        usage_tracker: Ranks users by usage so heavy users shed first. Optional.
+        on_threshold_changed: Called when the rejection threshold moves.
+
+    Returns:
+        A prioritizer for :class:`AdaptiveThrottler` instances.
+    """
+    return Prioritizer(
+        _ThrottlerRejectionStrategy(),
+        level_tracker=level_tracker,
+        usage_tracker=usage_tracker,
+        on_threshold_changed=on_threshold_changed,
+    )
+
+
 class AdaptiveThrottler:
     """Rejects a growing share of executions while a resource keeps failing.
 
@@ -67,7 +126,7 @@ class AdaptiveThrottler:
     rather than resetting, so a backend that recovers is not held back by old failures.
 
     One instance models one resource, so share it across every call that reaches that
-    resource (PLAN section 8 item 3)::
+    resource::
 
         throttler = AdaptiveThrottler(failure_rate_threshold=0.2)
         payments = Failsafe(retry, throttler)
@@ -97,6 +156,7 @@ class AdaptiveThrottler:
         "_is_failure",
         "_lock",
         "_max_rejection_rate",
+        "_prioritizer",
         "_rejection_rate",
         "_rng",
         "_stats",
@@ -139,6 +199,35 @@ class AdaptiveThrottler:
         self._rejection_rate = 0.0
         self.on_success = Listeners("on_success", on_success)
         self.on_failure = Listeners("on_failure", on_failure)
+        self._prioritizer: Prioritizer | None = None
+
+    def prioritized_by(self, prioritizer: Prioritizer) -> AdaptiveThrottler:
+        """Reject by priority level instead of uniformly at random.
+
+        Args:
+            prioritizer: The prioritizer to register with. Share one across policies to
+                shed load based on total system pressure.
+
+        Returns:
+            This throttler, for chaining.
+        """
+        self._prioritizer = prioritizer
+        prioritizer.register(self._throttler_stats)
+        return self
+
+    def _throttler_stats(self) -> _ThrottlerStats:
+        with self._lock:
+            return _ThrottlerStats(
+                executions=float(self._stats.executions),
+                rejection_rate=_compute_rejection_rate(
+                    self._stats.executions,
+                    self._stats.successes,
+                    self._success_rate_threshold,
+                    self._max_rejection_rate,
+                    self._execution_threshold,
+                ),
+                max_rejection_rate=self._max_rejection_rate,
+            )
 
     @property
     def rejection_rate(self) -> float:
@@ -168,7 +257,7 @@ class AdaptiveThrottler:
         with self._lock:
             return self._stats.failures
 
-    def _should_reject_locked(self) -> bool:
+    def _should_reject_locked(self, priority: Priority | None = None) -> bool:
         """Recompute the rejection rate and draw against it. Assumes the lock is held."""
         self._rejection_rate = _compute_rejection_rate(
             self._stats.executions,
@@ -177,41 +266,68 @@ class AdaptiveThrottler:
             self._max_rejection_rate,
             self._execution_threshold,
         )
+        if self._prioritizer is not None:
+            return self._should_reject_by_level(priority)
         if self._rejection_rate == 0:
             return False
         return self._rejection_rate >= 1 or self._rejection_rate >= self._rng.random()
 
-    def try_acquire_permit(self) -> bool:
+    def _should_reject_by_level(self, priority: Priority | None) -> bool:
+        """Reject below the prioritizer's threshold, letting a trickle through anyway."""
+        assert self._prioritizer is not None
+        level = self._prioritizer.level_for(priority)
+        if level >= self._prioritizer.rejection_threshold:
+            self._prioritizer.level_tracker.record_level(level)
+            return False
+        # Even fully throttled, some share is admitted so low priorities cannot starve.
+        if self._rng.random() < 1.0 - self._max_rejection_rate:
+            self._prioritizer.level_tracker.record_level(level)
+            return False
+        return True
+
+    def try_acquire_permit(self, priority: Priority | None = None) -> bool:
         """Attempt to acquire a permit, without raising.
+
+        Args:
+            priority: A priority to judge against when prioritized, overriding any in
+                scope.
 
         Returns:
             ``True`` if the execution may proceed.
         """
         with self._lock:
-            return not self._should_reject_locked()
+            return not self._should_reject_locked(priority)
 
-    def acquire_permit(self) -> None:
+    def acquire_permit(self, priority: Priority | None = None) -> None:
         """Acquire a permit to execute, or raise.
 
         Never blocks: the decision is immediate. The async form is identical, and
-        exists so callers need not know which one they hold (D-14).
+        exists so callers need not know which one they hold.
+
+        Args:
+            priority: A priority to judge against when prioritized, overriding any in
+                scope.
 
         Raises:
             ThrottleExceeded: If the execution was rejected.
         """
         with self._lock:
-            rejected = self._should_reject_locked()
+            rejected = self._should_reject_locked(priority)
             rate = self._rejection_rate
         if rejected:
             raise ThrottleExceeded(rate)
 
-    async def acquire_permit_async(self) -> None:
+    async def acquire_permit_async(self, priority: Priority | None = None) -> None:
         """Acquire a permit to execute, or raise.
+
+        Args:
+            priority: A priority to judge against when prioritized, overriding any in
+                scope.
 
         Raises:
             ThrottleExceeded: If the execution was rejected.
         """
-        self.acquire_permit()
+        self.acquire_permit(priority)
 
     def record_success(self) -> None:
         """Record an execution success."""

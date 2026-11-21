@@ -197,7 +197,7 @@ def test_policy_fires_listeners() -> None:
 
 
 def test_async_shares_state_with_sync() -> None:
-    """One throttler instance drives both drivers and shares its window (D-7)."""
+    """One throttler instance drives both drivers and shares its window."""
     throttler = AdaptiveThrottler()
 
     async def scenario() -> None:
@@ -210,7 +210,7 @@ def test_async_shares_state_with_sync() -> None:
 
 
 def test_acquire_permit_async_matches_sync() -> None:
-    """D-14: the same object offers both forms, so callers need not know which."""
+    """The same object offers both forms, so callers need not know which."""
     throttler = AdaptiveThrottler(
         execution_threshold=1, max_rejection_rate=1.0, rng=SequenceRandom([0.0])
     )

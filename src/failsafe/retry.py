@@ -182,7 +182,7 @@ class RetryPolicy:
         return step
 
     def _clamp(self, delay: float, ex: Execution) -> float:
-        """Clamp a delay to the remaining max-duration budget (PLAN section 8 item 2)."""
+        """Clamp a delay to the remaining max-duration budget."""
         if self.max_duration is not None:
             delay = min(delay, self.max_duration - ex.elapsed)
         return max(0.0, delay)

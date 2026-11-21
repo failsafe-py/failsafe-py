@@ -1,4 +1,4 @@
-"""Events and listener dispatch (D-10).
+"""Events and listener dispatch.
 
 Mirrors Go's ``events.go``. Two deviations, both deliberate:
 
@@ -111,7 +111,7 @@ Listener: TypeAlias = Callable[[Any], None]
 class Listeners:
     """A registered set of listeners for one event, called in registration order.
 
-    Accepts a single callable or a sequence of them, per D-10. Exceptions raised by a
+    Accepts a single callable or a sequence of them. Exceptions raised by a
     listener are logged and swallowed: an execution's outcome never depends on whether
     a metrics hook worked.
 

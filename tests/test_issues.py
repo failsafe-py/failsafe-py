@@ -3,10 +3,10 @@
 Only the issues that apply to phase 1 are here. The rest are out of scope by design:
 
 - issue65, issue73: HTTP body rewind and streaming (phase 3).
-- issue100: ``ComposeAny``/``WithAny``, which generics erasure deletes outright (D-15).
+- issue100: ``ComposeAny``/``WithAny``, which generics erasure deletes outright.
 - issue122: gRPC interceptors carrying context values (not ported).
 - issue134: child-context cancellation after completion; no analogue, since sync has no
-  cancellation and async uses task cancellation (D-5).
+  cancellation and async uses task cancellation.
 - issue141: hedge budgets (phase 6).
 """
 
@@ -123,7 +123,7 @@ def test_a_breaker_shared_across_threads_opens_once() -> None:
 
 
 def test_sync_and_async_callers_share_one_breaker() -> None:
-    """PLAN D-7's decisive property, under real concurrency rather than in sequence."""
+    """The sans-io core's decisive property, under real concurrency rather than in sequence."""
     breaker = CircuitBreaker(failure_threshold=1, delay=60.0, clock=FakeClock())
 
     with pytest.raises(ConnectionError):

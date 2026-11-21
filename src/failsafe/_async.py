@@ -36,7 +36,7 @@ class AsyncFailsafe:
     circuit breaker tripped by a sync call is seen open by an async one.
 
     Cancellation is ordinary :mod:`asyncio` cancellation. :exc:`asyncio.CancelledError`
-    is a :class:`BaseException` and is never treated as a failure or retried (D-5).
+    is a :class:`BaseException` and is never treated as a failure or retried.
 
     The result type is inferred from the function passed to :meth:`call`.
 

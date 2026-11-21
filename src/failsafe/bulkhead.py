@@ -27,7 +27,7 @@ class Bulkhead:
     each retry rather than holding a permit across the delay between them.
 
     A single instance serves both sync and async callers with one permit count, and
-    hands permits to waiters in arrival order (D-14)::
+    hands permits to waiters in arrival order::
 
         bulkhead = Bulkhead(10)
         api = Failsafe(bulkhead)

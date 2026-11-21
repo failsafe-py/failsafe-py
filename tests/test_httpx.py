@@ -332,7 +332,7 @@ def test_async_transport_retries_and_rewinds() -> None:
 
 
 def test_sync_and_async_transports_share_policy_state() -> None:
-    """D-7: one breaker, two transports, one circuit."""
+    """One breaker, two transports, one circuit."""
     breaker = CircuitBreaker(failure_threshold=1, handle=is_retryable, delay=60.0)
     handler, sent = responder(500, 200)
 

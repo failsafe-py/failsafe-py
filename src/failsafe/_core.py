@@ -3,7 +3,7 @@
 Policy logic is written once, as a generator that yields instructions. A driver
 (:mod:`failsafe._sync` or :mod:`failsafe._async`) decides how to service them, which
 is the only place sync and async differ. One policy instance therefore drives both,
-sharing its state across them (D-7).
+sharing its state across them.
 
 Nothing here imports :mod:`asyncio` or calls :func:`time.sleep`; blocking belongs to
 the drivers.
@@ -42,7 +42,7 @@ class Outcome(Generic[R]):
 
     The analogue of failsafe-go's ``common.PolicyResult``. Policies pass outcomes
     between layers so that a failure can be inspected without unwinding the stack;
-    only the driver boundary turns one back into a return or a raise (D-2).
+    only the driver boundary turns one back into a return or a raise.
     """
 
     value: R | None = None
@@ -134,7 +134,7 @@ class Execution:
 
     Mirrors failsafe-go's ``ExecutionInfo`` / ``ExecutionAttempt``. There is no
     ``cancelled`` flag: sync mode supports deadlines rather than cancellation, and
-    async cancellation surfaces as :exc:`asyncio.CancelledError` (D-5).
+    async cancellation surfaces as :exc:`asyncio.CancelledError`.
 
     Attributes are maintained by the core; user code reads them via
     :func:`failsafe.current_execution`.
@@ -257,7 +257,7 @@ class Acquire:
 
     Sent back to the policy as a :class:`bool`. The policy is responsible for
     releasing the permit in a ``finally`` block, which also covers a driver
-    abandoning the execution (PLAN section 8 item 7).
+    abandoning the execution.
     """
 
     semaphore: Any
@@ -274,7 +274,7 @@ class Race:
 
     - async interrupts the attempt mid-await via :func:`asyncio.timeout`;
     - sync is cooperative, checking the deadline between instructions, unless
-      ``interrupt`` asks for a worker thread (D-7).
+      ``interrupt`` asks for a worker thread.
     """
 
     inner: Any

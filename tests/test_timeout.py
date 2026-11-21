@@ -1,6 +1,6 @@
 """Timeout semantics, ported from failsafe-go's `timeout` package.
 
-Sync mode is cooperative unless ``interrupt=True`` (D-7), so the sync tests assert the
+Sync mode is cooperative unless ``interrupt=True``, so the sync tests assert the
 cooperative contract rather than Go's preemptive one; PORT.md item 1 records the
 deviation. Async mode matches Go, via :func:`asyncio.timeout`.
 """
@@ -53,7 +53,7 @@ def test_sync_timeout_fires_between_attempts(clock: FakeClock) -> None:
 
 
 def test_timeout_is_retryable_by_an_outer_retry(clock: FakeClock) -> None:
-    """PLAN section 8 item 6: TimeoutExceeded is an ordinary failure."""
+    """TimeoutExceeded is an ordinary failure."""
     attempts = 0
 
     def slow() -> str:
@@ -86,7 +86,7 @@ def test_timeout_outside_retry_bounds_all_attempts(clock: FakeClock) -> None:
 
 
 def test_timeout_overwrites_an_inner_result(clock: FakeClock) -> None:
-    """PLAN section 8 item 5: an inner fallback still processing must be interrupted."""
+    """An inner fallback still processing must be interrupted."""
 
     def slow_fallback(ex: object) -> str:
         clock.advance(10.0)
@@ -131,7 +131,7 @@ def test_deadline_is_restored_after_the_race(clock: FakeClock) -> None:
 
 
 def test_interrupting_timeout_frees_the_caller() -> None:
-    """D-7: interrupt=True releases the caller on time; the thread runs on."""
+    """interrupt=True releases the caller on time; the thread runs on."""
     finished = threading.Event()
 
     def slow() -> str:

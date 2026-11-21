@@ -1,4 +1,4 @@
-"""Tests for the cross-mode FIFO semaphore (D-14).
+"""Tests for the cross-mode FIFO semaphore.
 
 Concurrency here is driven by explicit handoff events rather than sleeps: every
 assertion is a positive observation of something that happened, not of something that
@@ -158,3 +158,92 @@ def test_cancelled_waiter_releases_a_permit_granted_in_the_race() -> None:
         assert sem.acquire(timeout=0)
 
     asyncio.run(scenario())
+
+
+def test_size_and_is_full_report_capacity() -> None:
+    sem = FifoSemaphore(2)
+
+    assert sem.size == 2
+    assert not sem.is_full
+
+    assert sem.acquire(timeout=0)
+    assert not sem.is_full
+    assert sem.acquire(timeout=0)
+    assert sem.is_full
+
+
+def test_growing_hands_new_permits_to_waiters() -> None:
+    """The adaptive limiter raises its limit by resizing; waiters must wake for it."""
+    sem = FifoSemaphore(1)
+    assert sem.acquire(timeout=0)
+    granted: list[bool] = []
+    waiting = threading.Event()
+
+    def wait_for_permit() -> None:
+        waiting.set()
+        granted.append(sem.acquire(5.0))
+
+    thread = threading.Thread(target=wait_for_permit, daemon=True)
+    thread.start()
+    waiting.wait(1.0)
+    deadline = time.monotonic() + 2.0
+    while sem.waiters == 0:
+        assert time.monotonic() < deadline, "waiter never queued"
+        time.sleep(0.001)
+
+    sem.resize(2)
+    thread.join(5.0)
+
+    assert granted == [True]
+    assert sem.used == 2
+    assert sem.waiters == 0
+
+
+def test_shrinking_never_revokes_a_held_permit() -> None:
+    sem = FifoSemaphore(3)
+    for _ in range(3):
+        assert sem.acquire(timeout=0)
+
+    sem.resize(1)
+
+    assert sem.size == 1
+    assert sem.used == 3
+    assert sem.is_full
+
+
+def test_releasing_after_a_shrink_drains_to_the_new_size() -> None:
+    """A waiter must not be handed a permit while the semaphore is still over its limit.
+
+    Handing the permit straight over keeps ``used`` above ``size`` forever, which would
+    pin the adaptive limiter above a limit it had just lowered.
+    """
+    sem = FifoSemaphore(3)
+    for _ in range(3):
+        assert sem.acquire(timeout=0)
+    granted: list[bool] = []
+    waiting = threading.Event()
+
+    def wait_for_permit() -> None:
+        waiting.set()
+        granted.append(sem.acquire(5.0))
+
+    thread = threading.Thread(target=wait_for_permit, daemon=True)
+    thread.start()
+    waiting.wait(1.0)
+    deadline = time.monotonic() + 2.0
+    while sem.waiters == 0:
+        assert time.monotonic() < deadline, "waiter never queued"
+        time.sleep(0.001)
+
+    sem.resize(1)
+    sem.release()
+    assert sem.used == 2
+    sem.release()
+    assert sem.used == 1
+    assert granted == [], "a waiter was woken while the semaphore was over its limit"
+
+    sem.release()
+    thread.join(5.0)
+
+    assert granted == [True]
+    assert sem.used == 1

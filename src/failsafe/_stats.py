@@ -12,7 +12,7 @@ import math
 
 from ._core import Clock
 
-__all__ = ["CountingStats", "Stats", "TimedStats", "round2"]
+__all__ = ["CountingStats", "Stats", "TimedStats", "TimedUsage", "round2"]
 
 
 def round2(value: float) -> float:
@@ -115,6 +115,40 @@ class TimedStats:
     def success_rate(self) -> float:
         """The share of successes, rounded as Go rounds."""
         return round2(self.successes / self.executions) if self.executions else 0.0
+
+
+class TimedUsage:
+    """A total over a rolling period, bucketed as :class:`TimedStats` is.
+
+    Backs the usage tracker's per-user totals, so a user who was heavy an hour ago is
+    not still paying for it.
+    """
+
+    __slots__ = ("_bucket", "_buckets", "_clock", "_count", "_head", "total")
+
+    def __init__(self, period: float, buckets: int, clock: Clock) -> None:
+        self._clock = clock
+        self._count = buckets
+        self._bucket = period / buckets
+        self._buckets = [0] * buckets
+        self._head = int(clock.now() / self._bucket)
+        self.total = 0
+
+    def expire(self) -> None:
+        """Drop buckets that have rolled out of the window."""
+        head = int(self._clock.now() / self._bucket)
+        if head > self._head:
+            for i in range(min(self._count, head - self._head)):
+                index = (self._head + i + 1) % self._count
+                self.total -= self._buckets[index]
+                self._buckets[index] = 0
+            self._head = head
+
+    def record(self, usage: int) -> None:
+        """Add ``usage`` to the current bucket."""
+        self.expire()
+        self._buckets[self._head % self._count] += usage
+        self.total += usage
 
 
 Stats = CountingStats | TimedStats

@@ -88,6 +88,28 @@ start at the documentation site.
 24. **Both transports accept `clock=`.** Go's transport reads the wall clock implicitly, so
     a `Retry-After` test must sleep for real. Injecting the clock keeps those tests exact
     and instant, and avoids tests reaching into private state to substitute one.
+25. **The adaptive limiter computes exact quantiles, not a t-digest sketch.** Go feeds recent
+    RTTs to `influxdata/tdigest`; we keep a sorted window. The limiter resets the structure on
+    every limit update, so it is a batch quantile over ~50–500 samples, where a digest carries
+    0.4–2.7% error and a sorted window carries none. Measured, not assumed.
+26. **Priority and user are contextvars, not context values.** `priority_scope`,
+    `level_scope` and `user_scope` replace Go's `ContextWithPriority` / `ContextWithLevel` /
+    `ContextWithUser`. Same ambient-propagation semantics, no parameter threading.
+27. **`Prioritizer.calibrate()` is explicit; the scheduler is an opt-in context manager.**
+    Go's `ScheduleCalibrations` spawns a goroutine and hands back a `CancelFunc`. A library
+    silently owning an OS thread is a worse bargain in Python, so `scheduled_calibrations(interval)`
+    scopes the thread to a `with` block and joins it on exit.
+28. **`Priority` is an `IntEnum`, and absence is `None` rather than `-1`.** Go returns `-1` from
+    `FromContext` for "no priority"; `current_priority()` and `current_level()` return `None`,
+    which cannot be mistaken for a valid level the way `-1` can be arithmetic'd into one.
+29. **Prioritized policies are built by `prioritized_by(p)`, not a separate type.** Go has
+    `PriorityLimiter` and `PriorityThrottler` interfaces produced by `BuildPrioritized`. One type
+    per policy with an opt-in registration keeps the surface smaller and lets the same instance be
+    described, metered and composed uniformly.
+30. **`FifoSemaphore.release()` rechecks capacity before waking a waiter.** Go's `Release`
+    decrements then wakes if `used < size`; our previous implementation handed the permit
+    straight over, which was correct only at a fixed size. With the limiter resizing the
+    semaphore downward, that would have pinned `used` above `size` indefinitely.
 
 ## One hazard worth stating plainly
 
@@ -121,6 +143,6 @@ write by accident.
 ## Not ported
 
 - gRPC integration (`failsafegrpc`).
-- Server-side HTTP helpers (`NewHandler`, `NewHandlerWithLevel`) — deferred past v0.1. When they
-  land they will keep Go's `X-Failsafe-Priority` / `X-Failsafe-Level` header names so Python and
-  Go services interoperate.
+- Server-side HTTP helpers (`NewHandler`, `NewHandlerWithLevel`) — deferred to roadmap phase 7.
+  When they land they will keep Go's `X-Failsafe-Priority` / `X-Failsafe-Level` header names so
+  Python and Go services interoperate.

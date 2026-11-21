@@ -178,7 +178,7 @@ def test_open_is_a_noop_when_already_open(clock: FakeClock) -> None:
 
 
 def test_half_open_admits_a_bounded_number_of_trials(clock: FakeClock) -> None:
-    """PLAN section 8 item 1: the cap that prevents a stampede on a recovering service."""
+    """The cap that prevents a stampede on a recovering service."""
     breaker = CircuitBreaker(failure_threshold=1, success_threshold=3, clock=clock)
     breaker.half_open()
 

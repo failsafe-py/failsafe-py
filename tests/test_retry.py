@@ -259,7 +259,7 @@ def test_handle_result_retries_a_value(clock: FakeClock) -> None:
 
 
 def test_result_condition_does_not_replace_default_error_handling(clock: FakeClock) -> None:
-    """PLAN section 8 item 4, Go's errorsChecked: handle=Result(x) keeps errors failing."""
+    """Go's errorsChecked: handle=Result(x) keeps errors failing."""
     policy = RetryPolicy(handle=Result("bad"), max_retries=2)
     with pytest.raises(RetriesExceeded):
         Failsafe(policy, clock=clock).call(flaky(9))
@@ -440,7 +440,7 @@ def test_listeners_accept_a_sequence(clock: FakeClock) -> None:
 
 
 def test_listener_registration_doubles_as_a_decorator(clock: FakeClock) -> None:
-    """D-10: policy.on_retry(fn) appends and returns fn."""
+    """policy.on_retry(fn) appends and returns fn."""
     policy = RetryPolicy(max_retries=1)
     log: list[int] = []
 

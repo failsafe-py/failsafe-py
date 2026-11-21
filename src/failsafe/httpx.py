@@ -11,7 +11,7 @@ execution::
     client = httpx.Client(transport=transport)
 
 Only the client side is ported. Go's server-side handlers have no analogue here: an
-ASGI middleware is a different shape, and nothing in the core needs one (D-12).
+ASGI middleware is a different shape, and nothing in the core needs one.
 """
 
 from __future__ import annotations
@@ -220,7 +220,7 @@ class AsyncFailsafeTransport(httpx.AsyncBaseTransport):
     """The async counterpart of :class:`FailsafeTransport`.
 
     Shares policy state with any :class:`FailsafeTransport` built from the same policy
-    objects, so one circuit breaker can guard both (D-7).
+    objects, so one circuit breaker can guard both.
 
     Args:
         *policies: The policies to apply, outermost first.

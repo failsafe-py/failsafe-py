@@ -2,7 +2,7 @@
 
 The load-bearing one is :func:`test_policy_state_is_shared_between_drivers`: if a policy
 object tripped by a sync call were not seen tripped by an async one, the sans-io design
-would buy nothing over duplicate implementations (D-7).
+would buy nothing over duplicate implementations.
 """
 
 from __future__ import annotations
@@ -141,7 +141,7 @@ def test_permit_is_released_when_the_driver_abandons_the_generator() -> None:
 
 
 def test_bulkhead_permit_is_acquired_per_attempt_when_inner_to_retry() -> None:
-    """Composed inside a retry, a bulkhead re-acquires per attempt (PLAN 8.7)."""
+    """Composed inside a retry, a bulkhead re-acquires per attempt."""
     bulkhead = Bulkhead(1)
     fs = Failsafe(RetryPolicy(max_retries=2), bulkhead, clock=FakeClock())
 
@@ -204,7 +204,7 @@ def test_each_async_task_sees_its_own_execution() -> None:
 
 
 def test_decorator_preserves_the_signature() -> None:
-    """D-4 and D-15: one object, usable as a decorator, with ParamSpec fidelity."""
+    """One object, usable as a decorator, with ParamSpec fidelity."""
     import inspect
 
     payments = Failsafe(RetryPolicy(max_retries=3), clock=FakeClock())
@@ -237,7 +237,7 @@ def test_async_decorator_preserves_the_signature() -> None:
 
 
 def test_decorated_functions_share_one_policy_set() -> None:
-    """The fragmentation hazard in D-4: one object, one breaker, many call sites."""
+    """The fragmentation hazard: one object, one breaker, many call sites."""
     breaker = CircuitBreaker(failure_threshold=2, clock=FakeClock())
     payments = Failsafe(breaker, clock=FakeClock())
 

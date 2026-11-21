@@ -2,7 +2,7 @@
 
 Go needs four builder families (``HandleErrors``, ``HandleErrorTypes``, ``HandleResult``,
 ``HandleIf``) because ``errors.Is`` is not ``errors.As`` and generics split results from
-errors. :func:`isinstance` collapses all four into one type (D-3), reused wherever Go has
+errors. :func:`isinstance` collapses all four into one type, reused wherever Go has
 a condition family: ``handle=`` and ``abort=`` on retry, ``handle=`` on fallback and the
 circuit breaker.
 """

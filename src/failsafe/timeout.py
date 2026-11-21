@@ -25,7 +25,7 @@ class Timeout:
 
     :exc:`~failsafe.TimeoutExceeded` is an ordinary failure, so an outer
     :class:`~failsafe.RetryPolicy` can retry it. An :exc:`asyncio.CancelledError`
-    cannot: that is terminal (PLAN section 8 item 6).
+    cannot: that is terminal.
 
     **Sync mode is cooperative by default.** Python cannot interrupt a running call, so
     the limit is enforced between instructions, and a function that blocks for a minute
@@ -75,7 +75,7 @@ class Timeout:
                 self.on_timeout.emit(ExecutionCompletedEvent(ex, None, exceeded))
             # Deliberately replaces whatever the inner policies produced: an inner
             # fallback may still have been processing a result when time ran out, and
-            # it must be interrupted rather than allowed to win (PLAN section 8 item 5).
+            # it must be interrupted rather than allowed to win.
             return Outcome(exc=exceeded)
 
         return step

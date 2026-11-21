@@ -8,6 +8,7 @@ __all__ = [
     "BulkheadFull",
     "CircuitBreakerOpen",
     "FailsafeError",
+    "LimitExceeded",
     "RateLimitExceeded",
     "RetriesExceeded",
     "ThrottleExceeded",
@@ -63,7 +64,7 @@ class TimeoutExceeded(FailsafeError):
     """A :class:`~failsafe.Timeout` elapsed before the execution finished.
 
     An ordinary failure: an outer :class:`~failsafe.RetryPolicy` may retry it, unlike
-    an :exc:`asyncio.CancelledError`, which is terminal (PLAN section 8 item 6).
+    an :exc:`asyncio.CancelledError`, which is terminal.
 
     Attributes:
         timeout: The configured limit in seconds.
@@ -112,3 +113,15 @@ class BulkheadFull(FailsafeError):
     def __init__(self, max_concurrency: int = 0) -> None:
         super().__init__(f"bulkhead full (max concurrency: {max_concurrency})")
         self.max_concurrency = max_concurrency
+
+
+class LimitExceeded(FailsafeError):
+    """An :class:`~failsafe.AdaptiveLimiter` rejected an execution.
+
+    Attributes:
+        limit: The concurrency limit in force when the execution was rejected.
+    """
+
+    def __init__(self, limit: int = 0) -> None:
+        super().__init__(f"concurrency limit exceeded (limit: {limit})")
+        self.limit = limit

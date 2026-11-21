@@ -2,7 +2,7 @@
 
 Mirrors failsafe-go's ``internal/util.DynamicSemaphore``, with one addition Go does
 not need: a single instance serves both sync and async callers, so a policy built on
-it (``Bulkhead``, ``AdaptiveLimiter``) has one permit count rather than two (D-14).
+it (``Bulkhead``, ``AdaptiveLimiter``) has one permit count rather than two.
 """
 
 from __future__ import annotations
@@ -95,6 +95,35 @@ class FifoSemaphore:
         with self._lock:
             return len(self._waiters)
 
+    @property
+    def size(self) -> int:
+        """The number of permits the semaphore allows."""
+        with self._lock:
+            return self._size
+
+    @property
+    def is_full(self) -> bool:
+        """Whether every permit is currently held."""
+        with self._lock:
+            return self._used >= self._size
+
+    def resize(self, size: int) -> None:
+        """Change how many permits the semaphore allows.
+
+        Growing the semaphore hands the new permits straight to the longest-waiting
+        callers. Shrinking never revokes a permit already held, so ``used`` may exceed
+        ``size`` until those callers release.
+
+        Args:
+            size: The new number of permits.
+        """
+        with self._lock:
+            if size > self._size:
+                while self._used < size and self._waiters:
+                    self._used += 1
+                    self._waiters.popleft().claim()
+            self._size = size
+
     def acquire(self, timeout: float | None = None) -> bool:
         """Acquire a permit, blocking the calling thread until one is available.
 
@@ -154,10 +183,12 @@ class FifoSemaphore:
         with self._lock:
             if self._used <= 0:
                 raise RuntimeError("release() called without a matching acquire()")
-            if self._waiters:
-                self._waiters.popleft().claim()  # handed over directly; _used unchanged
-            else:
-                self._used -= 1
+            self._used -= 1
+            # After a shrink `used` can exceed `size`; waking a waiter then would keep the
+            # semaphore permanently over its limit, so capacity is rechecked here.
+            if self._used < self._size and self._waiters:
+                self._used += 1
+                self._waiters.popleft().claim()
 
     def _available(self) -> bool:
         return self._used < self._size and not self._waiters

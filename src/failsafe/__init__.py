@@ -1,7 +1,6 @@
 """Fault tolerance and resilience policies for Python.
 
-A port of failsafe-go. See PLAN.md for the design and PORT.md for differences
-from the Go library.
+A port of failsafe-go.
 """
 
 from ._async import AsyncFailsafe
@@ -18,21 +17,35 @@ from ._exceptions import (
     BulkheadFull,
     CircuitBreakerOpen,
     FailsafeError,
+    LimitExceeded,
     RateLimitExceeded,
     RetriesExceeded,
     ThrottleExceeded,
     TimeoutExceeded,
 )
+from ._prioritizer import Prioritizer, ThresholdChangedEvent
 from ._sync import Failsafe
-from .adaptive_throttler import AdaptiveThrottler
+from .adaptive_limiter import AdaptiveLimiter, LimitChangedEvent, queue_prioritizer
+from .adaptive_throttler import AdaptiveThrottler, throttle_prioritizer
 from .bulkhead import Bulkhead
 from .circuit_breaker import CircuitBreaker, Rate, Ratio
 from .fallback import Fallback
+from .priority import (
+    LevelTracker,
+    Priority,
+    UsageTracker,
+    current_level,
+    current_user,
+    level_scope,
+    priority_scope,
+    user_scope,
+)
 from .rate_limiter import RateLimiter
 from .retry import RetryPolicy
 from .timeout import Timeout
 
 __all__ = [
+    "AdaptiveLimiter",
     "AdaptiveThrottler",
     "AsyncFailsafe",
     "Backoff",
@@ -50,6 +63,11 @@ __all__ = [
     "Fallback",
     "Fixed",
     "Jitter",
+    "LevelTracker",
+    "LimitChangedEvent",
+    "LimitExceeded",
+    "Prioritizer",
+    "Priority",
     "RandomDelay",
     "Rate",
     "RateLimitExceeded",
@@ -60,8 +78,17 @@ __all__ = [
     "RetryPolicy",
     "ScheduledRetryEvent",
     "StateChangedEvent",
+    "ThresholdChangedEvent",
     "ThrottleExceeded",
     "Timeout",
     "TimeoutExceeded",
+    "UsageTracker",
     "current_execution",
+    "current_level",
+    "current_user",
+    "level_scope",
+    "priority_scope",
+    "queue_prioritizer",
+    "throttle_prioritizer",
+    "user_scope",
 ]

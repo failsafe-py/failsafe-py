@@ -38,14 +38,33 @@ failsafe-go is itself not dependency-free, and both of its deps have stdlib equi
 | Go dep | Used for | Python replacement |
 |---|---|---|
 | `bits-and-blooms/bitset` | ring buffer of success/failure bits in `countingStats` | `collections.deque`, or an `int` as a bit vector |
-| `influxdata/tdigest` | streaming quantiles in the adaptive limiter | Go also ships `util.MovingQuantile` (windowless moving percentile, ~40 lines, O(1)); port that |
+| `influxdata/tdigest` | streaming quantiles in the adaptive limiter | a bounded sorted window (`_windows.QuantileWindow`) |
 
 Caveat: stdlib-only is free for every policy *except* the adaptive limiter, which needs a
 different internal data structure rather than a different library. Go samples recent RTTs into a
-t-digest; the replacement is `MovingQuantile` or a bounded `deque` with `bisect.insort`. At
-limiter-sized windows (tens to hundreds of samples) a sorted window gives exact percentiles and
-better accuracy than a sketch — t-digest only wins at sample counts this policy never reaches.
-Re-verify against Go's tests when that phase lands.
+t-digest; the replacement is a sorted window.
+
+**Corrected at phase 5.** Earlier drafts of this section offered `util.MovingQuantile` as the
+replacement. That is the wrong structure: `MovingQuantile` is a *windowless* estimator used by
+`hedgepolicy` (phase 6), and nothing in `adaptivelimiter` touches it. The limiter resets its
+t-digest on every limit update, so it is a *batch* quantile over one window's samples —
+`recentWindowMinSamples` defaults to 50.
+
+The accuracy claim was then measured rather than asserted, running Go's own `influxdata/tdigest`
+against an exact p90 over lognormal samples, 200 trials per size:
+
+| Window samples | t-digest mean relative error on p90 | Sorted window |
+|---:|---:|---:|
+| 50 | 2.66% | exact |
+| 100 | 1.38% | exact |
+| 200 | 0.68% | exact |
+| 500 | 0.36% | exact |
+
+So the sorted window is both simpler and strictly more accurate at every size this policy reaches;
+t-digest earns its keep in the millions, not the tens. `bisect.insort` is O(n) per sample against
+the digest's O(log n), which at n ≤ a few hundred is memmove on a contiguous list and not worth a
+dependency. `tests/test_windows.py::test_quantile_window_beats_a_sketch_at_limiter_sample_counts`
+pins the exactness.
 
 Rejected dependencies:
 
@@ -98,7 +117,7 @@ Rejected dependencies:
 | `sync.Mutex`, `atomic.*` | shared policy state | `threading.Lock` | Low |
 | `testing/synctest` | virtual clock in tests | injected clock (§9) | Medium |
 | `http.RoundTripper` | client middleware | `httpx.BaseTransport` | **Low — near-exact analogue** (D-12) |
-| `http.Handler` middleware | server side | ASGI middleware | deferred past v0.1 |
+| `http.Handler` middleware | server side | ASGI middleware | deferred — roadmap phase 7 |
 
 ---
 
@@ -201,8 +220,8 @@ filters. Go proves it: `BaseFailurePolicy.failureConditions` and
 `util.AppliesToAny`. They differ only in what the policy does on a match, so they take the same
 argument type (D-3).
 
-`AdaptiveLimiter` at 9 tuning parameters is the one policy where a nested config object may be
-warranted. Deferred until the policy has been used.
+`AdaptiveLimiter` at 9 tuning parameters was the one policy where a nested config object might
+have been warranted. Settled at phase 5, after building it: it stays flat. See D-17.
 
 ### D-2 — Results vs exceptions
 
@@ -413,7 +432,7 @@ Non-obvious behaviours to port from `failsafehttp`:
 - streaming responses: the execution is not done until the stream closes (Go wraps `resp.Body` to
   defer cancellation).
 
-Client side only for v0.1. Go's server-side helpers (`NewHandler`, `NewHandlerWithLevel`, priority
+Client side only. Go's server-side helpers (`NewHandler`, `NewHandlerWithLevel`, priority
 header decoding) are deferred; when they land they keep Go's header names `X-Failsafe-Priority`
 and `X-Failsafe-Level` so Python and Go services interoperate.
 
@@ -505,6 +524,46 @@ Implications:
   instead of rotting the published docs. That gate is what buys pkg.go.dev's always-current
   property.
 
+
+### D-17 — `AdaptiveLimiter` stays flat (settles the D-1 deferral)
+
+D-1 deferred this until the policy had been used. Having now built and tested it: **flat
+keyword-only parameters, no nested config object.**
+
+The count that motivated the deferral was 9 "tuning parameters", but they do not form 9
+independent axes a caller tunes. Two unions collapse what Go spreads across separate setters:
+
+| One parameter | Replaces Go's |
+|---|---|
+| `queueing=(initial, max)` | `WithQueueing(initialRejectionFactor, maxRejectionFactor)` |
+| `prioritized_by(prioritizer)` | `BuildPrioritized(p)` |
+
+What remains is one default-everything constructor (`AdaptiveLimiter()` matches Go's
+`NewWithDefaults`) plus parameters that are individually meaningful and essentially never set
+together. A nested `LimiterConfig` would add a second import, a second name to document, and an
+extra indirection on every attribute read, in exchange for grouping parameters that callers set
+one at a time. The tests bear this out: no test in `tests/test_adaptive_limiter.py` sets more
+than three non-default parameters, and the common cases set zero or one.
+
+This stays additive either way — a config object can be accepted later without breaking the
+keyword form, which is precisely why deferring it cost nothing.
+
+### D-18 — Calibration is explicit, not a library-owned thread
+
+Go's `ScheduleCalibrations(ctx, interval)` spawns a goroutine and returns a `CancelFunc`.
+Goroutines are cheap and ubiquitous in Go; a library silently owning an OS thread in Python is
+not the same bargain — it interacts badly with `fork`, with test suites, and with anyone running
+under an event loop who never asked for a thread.
+
+So `Prioritizer.calibrate()` is a plain method the caller schedules, and
+`Prioritizer.scheduled_calibrations(interval)` is an opt-in **context manager** that owns a daemon
+thread only for the duration of the block and joins it on exit. The context manager makes the
+lifetime lexical, which the Go `CancelFunc` leaves to the caller's discipline.
+
+No async variant is provided. The calibration body is pure CPU over in-memory counters with no
+awaits, so an asyncio user can call `calibrate()` from their own `asyncio.TaskGroup` loop and
+needs nothing from us to do it.
+
 ---
 
 ## 6. Public API
@@ -565,6 +624,33 @@ breaker = CircuitBreaker(handle=is_retryable, delay=retry_after_delay)
 
 # retry_policy() knows which HTTP failures are worth retrying, and honours Retry-After
 client = httpx.Client(transport=FailsafeTransport(retry_policy(max_retries=3), breaker))
+```
+
+
+Adaptive concurrency and prioritized load shedding:
+
+```python
+from failsafe import (
+    AdaptiveLimiter, AdaptiveThrottler, Failsafe, Priority, UsageTracker,
+    priority_scope, queue_prioritizer, user_scope,
+)
+
+# discovers the backend's real capacity instead of enforcing a number you guessed
+limiter = AdaptiveLimiter()
+payments = Failsafe(limiter)
+
+# shed load by priority during overload, coordinated across policies
+prioritizer = queue_prioritizer(usage_tracker=UsageTracker())
+limiter = AdaptiveLimiter(queueing=(2.0, 3.0)).prioritized_by(prioritizer)
+throttler = AdaptiveThrottler().prioritized_by(prioritizer)
+
+# priority is ambient, so it propagates without threading a parameter (D-11)
+with priority_scope(Priority.HIGH), user_scope(account_id):
+    payments.call(charge, amount)
+
+# the prioritizer only recomputes when asked; the caller owns the schedule (D-18)
+with prioritizer.scheduled_calibrations(1.0):
+    serve_forever()
 ```
 
 `Execution` (from Go's `ExecutionInfo` / `ExecutionAttempt`): `attempts`, `executions`, `retries`,
@@ -660,6 +746,26 @@ Each is a porting requirement.
     rewound anything. Body-rewind tests use a plain `BaseTransport` that drains
     `request.stream`. A mutation test (remove the buffering, watch the second attempt send
     `b""`) is the only proof that the test is load-bearing.
+16. **The limiter's quantile window is a *batch* over one sampling period, not a stream.**
+    `record` resets it after every limit update, so `recentWindowMinSamples` (50) is roughly
+    the window size. This is what makes an exact sorted window beat a t-digest here; see
+    section 2.
+17. **The limit is only real if the semaphore follows it.** `updateLimit` calls
+    `semaphore.SetSize(newLimit)` as well as storing the float. Porting the arithmetic without
+    the resize yields a limiter whose reported limit moves and whose actual concurrency never
+    does — `test_the_semaphore_follows_the_limit` pins it.
+18. **A shrinking semaphore must not hand a released permit to a waiter.** Go's `Release`
+    decrements, *then* wakes only if `used < size`. A handover-first implementation is correct
+    at a fixed size and permanently over-admits after a shrink, which is exactly what the
+    adaptive limiter does on every decrease. Found by porting the limiter, pinned by
+    `test_releasing_after_a_shrink_drains_to_the_new_size`, and mutation-verified.
+19. **A prioritized limiter with exactly one registered policy ignores the threshold first.**
+    `CanAcquirePermitWithLevel` short-circuits on local capacity when it is the only policy, so
+    it need not wait for the next calibration. With two or more it defers entirely to the shared
+    rejection threshold — tests that want threshold behaviour must register a second policy.
+20. **Levels are recorded only while the limiter is full.** The level distribution that sets the
+    rejection threshold must describe contention; recording during idle traffic would bias the
+    threshold toward levels that were never under pressure.
 
 ---
 
@@ -694,23 +800,24 @@ Go uses `testing/synctest` for a virtual clock; the equivalent here is an inject
 
 ## 10. Roadmap
 
-| Phase | Content | Exit criterion |
+| Phase | Content | Status |
 |---|---|---|
 | -1 | Repo skeleton, licence, AGENTS.md, this plan | **done** |
 | 0 | CI (ruff + mypy strict + pytest on 3.11–3.14), `_core`, `Execution`, `Outcome`, both drivers, fake clock | **done** |
-| 1 | `RetryPolicy`, `Fallback`, `Timeout`, `CircuitBreaker`, composition, events | **done** — `0.1`; Go's retry + breaker corpus ported and passing |
-| 2 | `AdaptiveThrottler` | **done** — `0.2`; Go's throttler corpus ported and passing |
-| 3 | `RateLimiter`, `Bulkhead`, `failsafe.httpx` client | **done** — `0.3`; Go's rate limiter and bulkhead corpora ported, body rewind pinned by mutation test |
-| 4 | `failsafe-py.dev` site + API reference on Read the Docs | `0.4` |
-| 5 | `AdaptiveLimiter`, `priority`, prioritized variants | `0.5` |
-| 6 | `HedgePolicy` (async only), `CachePolicy`, `Budget` | `0.6` |
+| 1 | `RetryPolicy`, `Fallback`, `Timeout`, `CircuitBreaker`, composition, events | **done** — Go's retry + breaker corpus ported and passing |
+| 2 | `AdaptiveThrottler` | **done** — Go's throttler corpus ported and passing |
+| 3 | `RateLimiter`, `Bulkhead`, `failsafe.httpx` client | **done** — Go's rate limiter and bulkhead corpora ported, body rewind pinned by mutation test |
+| 4 | `failsafe-py.dev` site + API reference on Read the Docs | **deferred** — skipped at the user's call; nothing in phase 5 depended on it |
+| 5 | `AdaptiveLimiter`, `priority`, prioritized variants | **done** — Go's limiter, priority and prioritizer corpora ported; quantile claim measured, not assumed |
+| 6 | `HedgePolicy` (async only), `CachePolicy`, `Budget` | planned |
 | 7 | Server-side HTTP: ASGI middleware, priority headers | post-`1.0` |
 | — | gRPC | out of scope |
 
-**Phase 4 — docs, as its own phase.** Port the `failsafe-go.dev` structure page-for-page; the
-layout is good and the examples translate almost 1:1. Includes the Go→Python mapping page and the
-deviations from `PORT.md`. failsafe and failsafe-go have *different* logos, so failsafe-py gets its
-own variation in Python's palette rather than reusing either.
+**Phase 4 — docs, deferred.** Skipped at the user's call during phase 5; nothing in phase 5
+depended on it. Port the `failsafe-go.dev` structure page-for-page; the layout is good and the
+examples translate almost 1:1. Includes the Go→Python mapping page and the deviations from
+`PORT.md`. failsafe and failsafe-go have *different* logos, so failsafe-py gets its own variation
+in Python's palette rather than reusing either.
 
 **Repos:** two — code and docs separate, mirroring the `failsafe-go` / `failsafe-go.dev` split.
 
@@ -720,7 +827,7 @@ own variation in Python's palette rather than reusing either.
 
 Not open questions — decisions deliberately postponed until there is evidence to make them with.
 
-- **`AdaptiveLimiter` configuration shape** (9 tuning parameters): revisit at phase 5, after the
-  policy has been used. A nested config object is an additive change.
+- **`AdaptiveLimiter` configuration shape** (9 tuning parameters): **settled at phase 5 — stays
+  flat.** See D-17.
 - **Named registry for `Failsafe` instances** (D-4): on the shelf. If the module-scope line proves
   annoying in practice, adding `Failsafe.for_backend(...)` breaks nothing.

@@ -39,7 +39,7 @@ class Failsafe:
 
     The composition is built once, here, rather than per call. Construct one instance
     per backend and reuse it: stateful policies model the health of a backend, so
-    constructing them per call site fragments their signal (D-4).
+    constructing them per call site fragments their signal.
 
     The result type is inferred from the function passed to :meth:`call`, so one
     composition can guard calls returning different types.
@@ -90,7 +90,7 @@ class Failsafe:
         Construct the composition once and reuse it. Writing
         ``@Failsafe(RetryPolicy(), CircuitBreaker())`` on twenty functions builds twenty
         independent breakers, each seeing a twentieth of the traffic, which no type
-        checker can catch (D-4).
+        checker can catch.
 
         Example:
             >>> payments = Failsafe(retry, breaker)
@@ -194,7 +194,7 @@ class Failsafe:
 
         The abandoned thread keeps running to completion: Python cannot kill a thread,
         and killing one mid-call would corrupt whatever it holds. This is the documented
-        cost of ``interrupt=True`` (D-7).
+        cost of ``interrupt=True``.
         """
         if self._pool is None:
             # ponytail: one unbounded pool per Failsafe, created on first interrupting

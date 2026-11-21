@@ -95,7 +95,7 @@ def test_executor_releases_the_permit_after_an_execution() -> None:
 
 
 def test_retry_reacquires_a_permit_per_attempt() -> None:
-    """PLAN section 8 item 7: the permit is held per attempt, not per execution.
+    """The permit is held per attempt, not per execution.
 
     A permit held across retry delays would deadlock a bulkhead of one against its
     own retries; releasing per attempt lets other callers interleave.
@@ -173,7 +173,7 @@ def test_concurrent_executions_are_capped() -> None:
 
 
 def test_async_and_sync_callers_share_one_permit_count() -> None:
-    """D-14: one instance, one count, across both worlds."""
+    """One instance, one count, across both worlds."""
     bulkhead = Bulkhead(1)
     bulkhead.try_acquire_permit()
 

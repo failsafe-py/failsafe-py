@@ -31,7 +31,7 @@ def test_composition_order_is_outermost_first() -> None:
 
 
 def test_chain_is_composed_once_not_per_call() -> None:
-    """Re-composing per call costs more than the rest of the core (PLAN D-7)."""
+    """Re-composing per call costs more than the rest of the core."""
     applied = 0
 
     class CountingPolicy:
@@ -144,7 +144,7 @@ def test_is_first_attempt_and_is_retry() -> None:
 
 
 def test_base_exception_is_never_caught_or_retried() -> None:
-    """A cancelled or interrupted caller is not a retryable failure (PLAN invariants)."""
+    """A cancelled or interrupted caller is not a retryable failure."""
     calls = 0
 
     def interrupted() -> str:
@@ -174,7 +174,7 @@ def test_compose_with_no_policies_invokes_once() -> None:
 
 
 def test_public_api_surface_resolves() -> None:
-    """Every name in __all__ must import and be documented (D-16's reference input)."""
+    """Every name in __all__ must import and be documented: it is the reference input."""
     import failsafe
 
     for name in failsafe.__all__:
