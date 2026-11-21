@@ -18,15 +18,18 @@ from ._exceptions import (
     CircuitBreakerOpen,
     FailsafeError,
     RetriesExceeded,
+    ThrottleExceeded,
     TimeoutExceeded,
 )
 from ._sync import Failsafe
+from .adaptive_throttler import AdaptiveThrottler
 from .circuit_breaker import CircuitBreaker, Rate, Ratio
 from .fallback import Fallback
 from .retry import RetryPolicy
 from .timeout import Timeout
 
 __all__ = [
+    "AdaptiveThrottler",
     "AsyncFailsafe",
     "Backoff",
     "CircuitBreaker",
@@ -49,6 +52,7 @@ __all__ = [
     "RetryPolicy",
     "ScheduledRetryEvent",
     "StateChangedEvent",
+    "ThrottleExceeded",
     "Timeout",
     "TimeoutExceeded",
     "current_execution",

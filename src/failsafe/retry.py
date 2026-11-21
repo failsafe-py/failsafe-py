@@ -56,6 +56,8 @@ class RetryPolicy:
         on_abort: Called once when an ``abort`` condition matches.
         on_success: Called when an attempt is not a failure.
         on_failure: Called after every failed attempt, including retried ones.
+        rng: The source of jitter and random-delay randomness. Injectable so tests
+            are deterministic.
 
     Raises:
         ValueError: If ``max_retries`` or ``max_duration`` is negative.
@@ -92,6 +94,7 @@ class RetryPolicy:
         on_abort: Listener | Sequence[Listener] | None = None,
         on_success: Listener | Sequence[Listener] | None = None,
         on_failure: Listener | Sequence[Listener] | None = None,
+        rng: random.Random | None = None,
     ) -> None:
         if max_retries is not None and max_retries < 0:
             raise ValueError("max_retries must not be negative; use None for unlimited")
@@ -100,7 +103,7 @@ class RetryPolicy:
         self._handle = FailureConditions(handle)
         self._abort = FailureConditions(abort) if abort is not None else None
         self._delay = delay
-        self._rng = random.Random()
+        self._rng = rng if rng is not None else random.Random()
         self.max_retries = max_retries
         """How many retries are allowed after the first attempt."""
         self.max_duration = None if max_duration is None else seconds(max_duration)

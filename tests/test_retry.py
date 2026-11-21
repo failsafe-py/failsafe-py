@@ -115,6 +115,21 @@ def test_random_delay_stays_in_range(clock: FakeClock) -> None:
     assert all(1.0 <= slept <= 3.0 for slept in clock.slept)
 
 
+def test_injected_rng_makes_delays_reproducible(clock: FakeClock) -> None:
+    """The RNG is a seam like the clock: same seed, same delays, no seed-and-hope."""
+    import random
+
+    def run() -> list[float]:
+        local = FakeClock()
+        policy = RetryPolicy(delay=RandomDelay(1.0, 3.0), max_retries=None, rng=random.Random(7))
+        Failsafe(policy, clock=local).call(flaky(10))
+        return local.slept
+
+    first, second = run(), run()
+    assert first == second
+    assert len(set(first)) > 1, "a random delay must actually vary"
+
+
 def test_jitter_factor_stays_in_range(clock: FakeClock) -> None:
     """Go TestJitterFactorDelay: delay within [d*(1-f), d*(1+f)]."""
     policy = RetryPolicy(delay=Fixed(1.0, jitter=Jitter(factor=0.25)), max_retries=None)

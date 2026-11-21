@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
-__all__ = ["CircuitBreakerOpen", "FailsafeError", "RetriesExceeded", "TimeoutExceeded"]
+__all__ = [
+    "CircuitBreakerOpen",
+    "FailsafeError",
+    "RetriesExceeded",
+    "ThrottleExceeded",
+    "TimeoutExceeded",
+]
 
 
 class FailsafeError(Exception):
@@ -64,3 +70,19 @@ class TimeoutExceeded(FailsafeError):
     def __init__(self, timeout: float) -> None:
         super().__init__(f"timeout exceeded after {timeout}s")
         self.timeout = timeout
+
+
+class ThrottleExceeded(FailsafeError):
+    """An :class:`~failsafe.AdaptiveThrottler` rejected an execution without running it.
+
+    Rejection is probabilistic: an identical call a moment later may be admitted, since
+    the throttler always lets some traffic through to probe for recovery.
+
+    Attributes:
+        rejection_rate: The share of executions being rejected when this one was, from
+            ``0`` to ``1``.
+    """
+
+    def __init__(self, rejection_rate: float = 0.0) -> None:
+        super().__init__(f"throttled (rejection rate: {rejection_rate:.3f})")
+        self.rejection_rate = rejection_rate

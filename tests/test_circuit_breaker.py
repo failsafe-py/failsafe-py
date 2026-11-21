@@ -144,6 +144,25 @@ def test_random_delay_stays_in_range(clock: FakeClock) -> None:
         assert 0.05 <= breaker.remaining_delay() <= 0.15
 
 
+def test_injected_rng_makes_the_delay_reproducible(clock: FakeClock) -> None:
+    """The RNG is a seam like the clock: same seed, same jittered delay."""
+    import random
+
+    def run() -> list[float]:
+        breaker = CircuitBreaker(delay=RandomDelay(1.0, 3.0), clock=clock, rng=random.Random(7))
+        delays = []
+        for _ in range(5):
+            breaker.open()
+            delays.append(breaker.remaining_delay())
+            breaker.close()
+        return delays
+
+    first, second = run(), run()
+    assert first == second
+    assert all(1.0 <= d <= 3.0 for d in first)
+    assert len(set(first)) > 1, "a random delay must actually vary"
+
+
 def test_open_is_a_noop_when_already_open(clock: FakeClock) -> None:
     """Go: open() returns early if already open, so the delay does not restart."""
     log: list[str] = []

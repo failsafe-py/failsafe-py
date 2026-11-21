@@ -13,7 +13,7 @@ is a parameter that silently does nothing in a valid-looking config.
 from __future__ import annotations
 
 import random
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any, TypeAlias
@@ -151,12 +151,12 @@ class RandomDelay:
         if seconds(self.min_delay) > seconds(self.max_delay):
             raise ValueError("min_delay must not exceed max_delay")
 
-    def __iter__(self) -> Any:
-        """Yield each random draw."""
+    def draws(self, rng: random.Random) -> Iterator[float]:
+        """Yield each random draw, from the policy's injected RNG."""
         low = seconds(self.min_delay)
         high = seconds(self.max_delay)
         while True:
-            yield low + random.random() * (high - low)
+            yield low + rng.random() * (high - low)
 
 
 Delay: TypeAlias = (
@@ -199,7 +199,7 @@ def compile_delay(
         return lambda ex: fixed
     if isinstance(delay, Fixed | Backoff | RandomDelay):
         jitter = _as_jitter(delay.jitter)
-        values = iter(delay)
+        values = delay.draws(jitter_rng) if isinstance(delay, RandomDelay) else iter(delay)
         if jitter is None:
             return lambda ex: next(values)
         return lambda ex: jitter.apply(next(values), jitter_rng)

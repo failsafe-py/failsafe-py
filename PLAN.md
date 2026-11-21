@@ -450,7 +450,11 @@ leaked waiters on timeout — prototyped.
 
 ### D-15 — Typing
 
-- `Generic[R]` on policies and `Failsafe`, defaulting to `Any`.
+- **`Failsafe` is not `Generic[R]`; `call` is.** The original plan said `Generic[R]`
+  defaulting to `Any`, but PEP 696 defaults need 3.13 and the floor is 3.11. On 3.11
+  `Failsafe(retry)` infers `Never`, so every example here would need `Failsafe[str](retry)`.
+  Inferring `R` per `call` keeps `fs.call(connect, host)` typed with no annotation.
+  Policies stay non-generic for the same reason; nothing in the engine needs `R`.
 - Go's `ResultAgnosticPolicy`, `ComposeAny`, `WithAny` and type tokens all vanish —
   `CircuitBreaker[Any]` composes with `Failsafe[Response]` for free under mypy.
 - `py.typed`; strict mypy and pyright clean. Bad typing is the top complaint about Python
@@ -611,6 +615,14 @@ Each is a porting requirement.
    The generator must release in `finally` for the abandonment case.
 8. **Hedges count as attempts** (`CopyForHedge` increments both `attempts` and `hedges`), and the
    winning attempt cancels the losers with its own result rather than a cancellation error.
+9. **The adaptive throttler's window is bucketed at 20 buckets, the circuit breaker's at 10**
+   (`NewTimedStats(20, ...)` vs `defaultBucketCount`). Both expire buckets on *write* only, so a
+   window nobody has written to still reports its last totals; a read-side expiry would be a
+   silent behavioural change.
+10. **The throttler's `executionPadding` of 1** (`excess / (executions + 1)`) keeps the rejection
+    rate strictly below 1 at low execution counts, so a handful of failures cannot wedge a
+    resource shut. `max_rejection_rate` then caps it, defaulting to `.9` so a recovering backend
+    always receives probe traffic.
 
 ---
 
@@ -629,6 +641,17 @@ Go uses `testing/synctest` for a virtual clock; the equivalent here is an inject
 - Concurrency tests (semaphore fairness, hedge cancellation) need real threads and a real loop.
   Keep them few, bounded and deterministic, driven by explicit handoff events rather than sleeping
   and hoping — a "still blocked at t=0.1 s" check is a negative observation and weak evidence.
+- **The clock seam has two documented holes, both structural.** `asyncio.timeout` runs on the
+  event loop's own clock, which no injected clock can drive, so async deadline tests use real
+  sub-100 ms waits and `_async._race` translates loop time onto the configured clock for
+  `Execution.remaining()`. Interrupting sync timeouts wait on a real OS thread via
+  `concurrent.futures.wait`, and a `FakeClock` cannot make another thread finish, so that wait
+  is deliberately wall-clock too.
+- **Randomness is a seam like time.** Every policy whose behaviour is probabilistic takes an
+  `rng: random.Random` alongside `clock=`: `RetryPolicy` and `CircuitBreaker` for delay jitter
+  and `RandomDelay`, `AdaptiveThrottler` for its rejection draw. Tests seed it or supply a fixed
+  sequence rather than seeding the global module, which turns Go's loop-until-it-rejects tests
+  (documented there as 99.99% reliable) into exact assertions.
 
 ---
 
@@ -636,10 +659,10 @@ Go uses `testing/synctest` for a virtual clock; the equivalent here is an inject
 
 | Phase | Content | Exit criterion |
 |---|---|---|
-| -1 | Repo skeleton, licence, AGENTS.md, this plan | committed |
-| 0 | CI (ruff + mypy strict + pytest on 3.11–3.14), `_core`, `Execution`, `Outcome`, both drivers, fake clock | core exercised by real tests |
-| 1 | `RetryPolicy`, `Fallback`, `Timeout`, `CircuitBreaker`, composition, events | `0.1`; Go's retry + breaker corpus ported and passing |
-| 2 | `AdaptiveThrottler` | `0.2`. The primary motivation for the port, and nothing else in Python has it. The plain throttler needs neither the `priority` package nor a semaphore, so it can land this early |
+| -1 | Repo skeleton, licence, AGENTS.md, this plan | **done** |
+| 0 | CI (ruff + mypy strict + pytest on 3.11–3.14), `_core`, `Execution`, `Outcome`, both drivers, fake clock | **done** |
+| 1 | `RetryPolicy`, `Fallback`, `Timeout`, `CircuitBreaker`, composition, events | **done** — `0.1`; Go's retry + breaker corpus ported and passing |
+| 2 | `AdaptiveThrottler` | **done** — `0.2`; Go's throttler corpus ported and passing |
 | 3 | `RateLimiter`, `Bulkhead`, `failsafe.httpx` client | `0.3`; body-rewind and streaming-cancellation tests pass |
 | 4 | `failsafe-py.dev` site + API reference on Read the Docs | `0.4` |
 | 5 | `AdaptiveLimiter`, `priority`, prioritized variants | `0.5` |

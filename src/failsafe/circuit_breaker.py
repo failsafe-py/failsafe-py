@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import collections
-import math
 import random
 import threading
 from collections.abc import Generator, Sequence
@@ -16,6 +14,10 @@ from ._core import SYSTEM_CLOCK, Clock, Execution, Instruction, Outcome, Step
 from ._delays import Delay, compile_delay, seconds
 from ._events import ExecutionEvent, Listener, Listeners, StateChangedEvent
 from ._exceptions import CircuitBreakerOpen
+from ._stats import CountingStats, Stats, TimedStats
+
+_BUCKETS = 10
+"""Go's circuitbreaker defaultBucketCount."""
 
 __all__ = ["CircuitBreaker", "Rate", "Ratio"]
 
@@ -25,8 +27,6 @@ OPEN = "open"
 """Executions are rejected until the delay elapses."""
 HALF_OPEN = "half-open"
 """A bounded number of trial executions is admitted."""
-
-_BUCKETS = 10
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,94 +84,6 @@ class Rate:
             raise ValueError("period must be positive")
 
 
-class _CountingStats:
-    """A ring of the last ``capacity`` results, as Go's ``countingStats``."""
-
-    __slots__ = ("_capacity", "_results", "failures", "successes")
-
-    def __init__(self, capacity: int) -> None:
-        self._capacity = max(1, capacity)
-        self._results: collections.deque[bool] = collections.deque(maxlen=self._capacity)
-        self.successes = 0
-        self.failures = 0
-
-    def record(self, success: bool) -> None:
-        if len(self._results) == self._capacity:
-            evicted = self._results[0]
-            if evicted:
-                self.successes -= 1
-            else:
-                self.failures -= 1
-        self._results.append(success)
-        if success:
-            self.successes += 1
-        else:
-            self.failures += 1
-
-    @property
-    def executions(self) -> int:
-        return len(self._results)
-
-    def failure_rate(self) -> float:
-        return _round2(self.failures / self.executions) if self.executions else 0.0
-
-    def success_rate(self) -> float:
-        return _round2(self.successes / self.executions) if self.executions else 0.0
-
-
-class _TimedStats:
-    """Results within a rolling period, bucketed as Go's ``timedStats``."""
-
-    __slots__ = ("_bucket", "_buckets", "_clock", "_head", "failures", "successes")
-
-    def __init__(self, period: float, clock: Clock) -> None:
-        self._clock = clock
-        self._bucket = period / _BUCKETS
-        self._buckets: list[list[int]] = [[0, 0] for _ in range(_BUCKETS)]
-        self._head = int(clock.now() / self._bucket)
-        self.successes = 0
-        self.failures = 0
-
-    def _current(self) -> list[int]:
-        """Expire buckets that have rolled out of the window, as Go does on write."""
-        head = int(self._clock.now() / self._bucket)
-        if head > self._head:
-            for i in range(min(_BUCKETS, head - self._head)):
-                bucket = self._buckets[(self._head + i + 1) % _BUCKETS]
-                self.successes -= bucket[0]
-                self.failures -= bucket[1]
-                bucket[0] = bucket[1] = 0
-            self._head = head
-        return self._buckets[self._head % _BUCKETS]
-
-    def record(self, success: bool) -> None:
-        bucket = self._current()
-        if success:
-            bucket[0] += 1
-            self.successes += 1
-        else:
-            bucket[1] += 1
-            self.failures += 1
-
-    @property
-    def executions(self) -> int:
-        return self.successes + self.failures
-
-    def failure_rate(self) -> float:
-        return _round2(self.failures / self.executions) if self.executions else 0.0
-
-    def success_rate(self) -> float:
-        return _round2(self.successes / self.executions) if self.executions else 0.0
-
-
-def _round2(value: float) -> float:
-    """Round half away from zero to two decimals, as Go's ``util.Round``.
-
-    :func:`round` would use banker's rounding, which disagrees with Go at exactly .005.
-    """
-    return math.floor(value * 100 + 0.5) / 100
-
-
 class CircuitBreaker:
     """Blocks executions against a resource that is failing, letting it recover.
 
@@ -212,6 +124,7 @@ class CircuitBreaker:
         on_state_change: Called after any of the above, with the same event.
         on_success: Called when an execution is recorded as a success.
         on_failure: Called when an execution is recorded as a failure.
+        rng: The source of delay jitter. Injectable so tests are deterministic.
     """
 
     __slots__ = (
@@ -254,11 +167,12 @@ class CircuitBreaker:
         on_state_change: Listener | Sequence[Listener] | None = None,
         on_success: Listener | Sequence[Listener] | None = None,
         on_failure: Listener | Sequence[Listener] | None = None,
+        rng: random.Random | None = None,
     ) -> None:
         self._lock = threading.Lock()
         self._clock = clock
         self._handle = FailureConditions(handle)
-        self._rng = random.Random()
+        self._rng = rng if rng is not None else random.Random()
         self._delay = compile_delay(delay, self._rng)
         self.delay_seconds = 0.0
         """Seconds the breaker will stay open, as computed when it last opened."""
@@ -309,7 +223,7 @@ class CircuitBreaker:
         self._state = CLOSED
         self._opened_at = 0.0
         self._permits = 0
-        self._stats: _CountingStats | _TimedStats = self._new_stats()
+        self._stats: Stats = self._new_stats()
 
     @property
     def state(self) -> str:
@@ -510,7 +424,7 @@ class CircuitBreaker:
         # execution threshold, then the failure capacity. It sizes both the trial ring
         # and the admission cap, so the breaker can see every trial it admitted.
         capacity = self._success_capacity or self._min_executions or self._capacity
-        self._stats = _CountingStats(capacity)
+        self._stats = CountingStats(capacity)
         self._permits = capacity
         events.append((self.on_half_open, StateChangedEvent(previous, HALF_OPEN)))
 
@@ -521,11 +435,11 @@ class CircuitBreaker:
         self._stats = self._new_stats()
         events.append((self.on_close, StateChangedEvent(previous, CLOSED)))
 
-    def _new_stats(self) -> _CountingStats | _TimedStats:
+    def _new_stats(self) -> Stats:
         """Build the closed-state window, which is time-based only if a Rate is set."""
         if self._period is not None:
-            return _TimedStats(self._period, self._clock)
-        return _CountingStats(self._capacity)
+            return TimedStats(self._period, _BUCKETS, self._clock)
+        return CountingStats(self._capacity)
 
 
 def _emit(events: list[tuple[Listeners, StateChangedEvent]], on_state_change: Listeners) -> None:

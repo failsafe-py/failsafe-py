@@ -50,6 +50,17 @@ start at the documentation site.
 12. **A callable `delay=` yields no delay for a manual breaker transition.** Go keeps `DelayFunc`
     and `Delay` in separate fields, so `Open()` falls back to the fixed one. A single `delay=`
     union has nothing to fall back to.
+13. **`AdaptiveThrottler.record_result(outcome)` replaces Go's `RecordResult` and `RecordError`.**
+    Go needs two methods because a zero value is indistinguishable from "no result"; an
+    `Outcome` carries both, matching `CircuitBreaker.record`.
+14. **The throttler takes no `abort=`.** Go's throttler builder has no abort methods, and an
+    abort has no meaning for a policy that never retries.
+15. **`on_success`/`on_failure` do not fire for a throttled rejection**, matching Go, where the
+    hooks live in the executor that `PreExecute` short-circuits. A rejection is not an execution
+    result, and it is not recorded in the window either.
+16. **Policies with probabilistic behaviour accept `rng=`.** Go seeds the global `math/rand`;
+    `RetryPolicy`, `CircuitBreaker` and `AdaptiveThrottler` each take an optional
+    `random.Random`, so tests are exact rather than statistically likely.
 
 ## One hazard worth stating plainly
 
