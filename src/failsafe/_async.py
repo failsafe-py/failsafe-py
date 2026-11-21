@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Generator
-from typing import Any, TypeVar
+import asyncio
+import functools
+from collections.abc import Awaitable, Callable, Coroutine, Generator
+from typing import Any, ParamSpec, TypeVar
 
 from ._core import (
     SYSTEM_CLOCK,
@@ -14,6 +16,7 @@ from ._core import (
     Invoke,
     Outcome,
     Policy,
+    Race,
     Sleep,
     compose,
     set_current_execution,
@@ -22,6 +25,7 @@ from ._core import (
 __all__ = ["AsyncFailsafe"]
 
 R = TypeVar("R")
+P = ParamSpec("P")
 
 
 class AsyncFailsafe:
@@ -68,14 +72,32 @@ class AsyncFailsafe:
         ex = Execution(self._clock)
         token = set_current_execution(ex)
         try:
-            outcome = await self._pump(self._chain(ex), fn, args, kwargs)
+            outcome = await self._pump(self._chain(ex), ex, fn, args, kwargs)
             return outcome.unwrap()
         finally:
             token.var.reset(token)
 
+    def __call__(self, fn: Callable[P, Awaitable[R]]) -> Callable[P, Coroutine[Any, Any, R]]:
+        """Decorate a coroutine function so every call runs under these policies.
+
+        The decorated function keeps its signature, name and docstring.
+
+        Example:
+            >>> payments = AsyncFailsafe(retry, breaker)
+            >>> @payments
+            ... async def charge(amount): ...
+        """
+
+        @functools.wraps(fn)
+        async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+            return await self.call(fn, *args, **kwargs)
+
+        return wrapper
+
     async def _pump(
         self,
         gen: Generator[Instruction, Any, Outcome[Any]],
+        ex: Execution,
         fn: Callable[..., Awaitable[R]],
         args: tuple[Any, ...],
         kwargs: dict[str, Any],
@@ -89,7 +111,7 @@ class AsyncFailsafe:
                 except StopIteration as stop:
                     outcome: Outcome[R] = stop.value
                     return outcome
-                sent = await self._service(instruction, fn, args, kwargs)
+                sent = await self._service(instruction, ex, fn, args, kwargs)
         finally:
             # Lets policies release permits from a finally block when the driver stops
             # pumping, which includes the task being cancelled mid-execution.
@@ -98,6 +120,7 @@ class AsyncFailsafe:
     async def _service(
         self,
         instruction: Instruction,
+        ex: Execution,
         fn: Callable[..., Awaitable[R]],
         args: tuple[Any, ...],
         kwargs: dict[str, Any],
@@ -112,4 +135,37 @@ class AsyncFailsafe:
             return None
         if type(instruction) is Acquire:
             return await instruction.semaphore.acquire_async(instruction.timeout)
+        if type(instruction) is Race:
+            return await self._race(instruction, ex, fn, args, kwargs)
         raise AssertionError(f"unknown instruction {instruction!r}")
+
+    async def _race(
+        self,
+        race: Race,
+        ex: Execution,
+        fn: Callable[..., Awaitable[R]],
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+    ) -> Outcome[Any] | None:
+        """Run an inner step under a deadline, returning ``None`` if it elapsed.
+
+        :func:`asyncio.timeout` is the mechanism, not something to reimplement: it
+        interrupts whatever is awaiting inside the scope and exposes the absolute
+        deadline, which user code reads through ``Execution.remaining()``.
+        """
+        previous_deadline = ex.deadline
+        try:
+            # Relative seconds: asyncio.timeout_at is the absolute-deadline variant.
+            async with asyncio.timeout(race.seconds) as scope:
+                ex.deadline = self._deadline_from(scope.when())
+                return await self._pump(race.inner(ex), ex, fn, args, kwargs)
+        except TimeoutError:
+            return None
+        finally:
+            ex.deadline = previous_deadline
+
+    def _deadline_from(self, when: float | None) -> float | None:
+        """Translate a loop-clock deadline onto the configured clock."""
+        if when is None:
+            return None
+        return self._clock.now() + (when - asyncio.get_running_loop().time())

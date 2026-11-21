@@ -26,6 +26,7 @@ __all__ = [
     "Invoke",
     "Outcome",
     "Policy",
+    "Race",
     "Step",
     "compose",
     "current_execution",
@@ -263,7 +264,25 @@ class Acquire:
     timeout: float | None = None
 
 
-Instruction = Invoke | Sleep | Acquire
+@dataclass(frozen=True, slots=True)
+class Race:
+    """Run ``inner`` under a deadline, abandoning it after ``seconds``.
+
+    Sent back to the policy as the inner :class:`Outcome`, or ``None`` if the deadline
+    elapsed first. The two drivers differ fundamentally here, which is why this is an
+    instruction rather than policy code:
+
+    - async interrupts the attempt mid-await via :func:`asyncio.timeout`;
+    - sync is cooperative, checking the deadline between instructions, unless
+      ``interrupt`` asks for a worker thread (D-7).
+    """
+
+    inner: Any
+    seconds: float
+    interrupt: bool = False
+
+
+Instruction = Invoke | Sleep | Acquire | Race
 """Anything a policy may yield to a driver."""
 
 Step = Callable[[Execution], Generator[Instruction, Any, Outcome[Any]]]

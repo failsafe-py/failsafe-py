@@ -619,8 +619,10 @@ Each is a porting requirement.
 Go uses `testing/synctest` for a virtual clock; the equivalent here is an injected one.
 
 - **One time seam** in `_core` (`clock()` plus the drivers' sleep). Tests install a `FakeClock`
-  that advances instantly: no `time.sleep` in the suite, no flaky CI. This seam is required by the
-  design, not bolted on for tests.
+  that advances instantly: no `time.sleep` on the clock seam or in assertion paths, no flaky CI.
+  This seam is required by the design, not bolted on for tests. Thread-coordination tests may
+  poll observable state at a short interval with a deadline, which is a positive observation of
+  a handoff rather than a guess at a duration.
 - **Port failsafe-go's test corpus where it encodes semantics** — `circuitbreaker` (4 files),
   `ratelimiter` (4), `retrypolicy` (2), `test/issues/`. Those tests are the specification; for
   anything ambiguous, cross-check against Go behaviour rather than inventing.

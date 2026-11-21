@@ -10,30 +10,44 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-from helpers import Backoff, BreakerOpen, Bulkhead, CountingBreaker, Retry, aflaky, flaky
+from conftest import Bulkhead, aflaky, flaky
 
-from failsafe import AsyncFailsafe, Failsafe, current_execution
+from failsafe import (
+    AsyncFailsafe,
+    Backoff,
+    CircuitBreaker,
+    CircuitBreakerOpen,
+    Failsafe,
+    RetryPolicy,
+    current_execution,
+)
 from failsafe._core import Acquire, Execution, FakeClock, compose
 from failsafe._semaphore import FifoSemaphore
 
 
 def test_policy_state_is_shared_between_drivers() -> None:
-    breaker = CountingBreaker(failure_threshold=1)
+    breaker = CircuitBreaker(failure_threshold=1, clock=FakeClock())
+    invoked = 0
+
+    async def probe() -> str:
+        nonlocal invoked
+        invoked += 1
+        return "ok"
 
     with pytest.raises(ConnectionError):
         Failsafe(breaker, clock=FakeClock()).call(flaky(9))
     assert breaker.is_open
 
     async def scenario() -> None:
-        with pytest.raises(BreakerOpen):
-            await AsyncFailsafe(breaker, clock=FakeClock()).call(aflaky(0))
+        with pytest.raises(CircuitBreakerOpen):
+            await AsyncFailsafe(breaker, clock=FakeClock()).call(probe)
 
     asyncio.run(scenario())
-    assert breaker.rejected == 1
+    assert invoked == 0, "the async side must see the breaker the sync side tripped"
 
 
 def test_one_policy_object_drives_both_modes() -> None:
-    retry = Retry(max_retries=3, delay=1.0)
+    retry = RetryPolicy(max_retries=3, delay=1.0)
     sync_clock = FakeClock()
     async_clock = FakeClock()
 
@@ -50,7 +64,7 @@ def test_one_policy_object_drives_both_modes() -> None:
 
 def test_backoff_state_is_per_execution_not_per_policy() -> None:
     """A shared policy must not carry one execution's backoff into the next."""
-    policy = Backoff(delay=1.0, max_retries=3)
+    policy = RetryPolicy(delay=Backoff(1.0, 60.0), max_retries=3)
     first, second = FakeClock(), FakeClock()
 
     Failsafe(policy, clock=first).call(flaky(3))
@@ -80,7 +94,7 @@ def test_cancelled_error_is_not_retried() -> None:
 
     async def scenario() -> None:
         with pytest.raises(asyncio.CancelledError):
-            await AsyncFailsafe(Retry(max_retries=5), clock=FakeClock()).call(cancelled)
+            await AsyncFailsafe(RetryPolicy(max_retries=5), clock=FakeClock()).call(cancelled)
 
     asyncio.run(scenario())
     assert calls == 1
@@ -97,7 +111,7 @@ def test_task_cancellation_propagates_and_releases_permits() -> None:
         return "never"
 
     async def scenario() -> None:
-        fs = AsyncFailsafe(Bulkhead(sem), Retry(max_retries=5))
+        fs = AsyncFailsafe(Bulkhead(sem), RetryPolicy(max_retries=5))
         task = asyncio.ensure_future(fs.call(hang))
         await started.wait()
         assert sem.used == 1
@@ -114,7 +128,7 @@ def test_permit_is_released_when_the_driver_abandons_the_generator() -> None:
     """The driver may stop pumping at any instruction; finally must still run."""
     sem = FifoSemaphore(1)
     ex = Execution(FakeClock())
-    gen = compose((Bulkhead(sem), Retry(max_retries=1, delay=1.0)))(ex)
+    gen = compose((Bulkhead(sem), RetryPolicy(max_retries=1, delay=1.0)))(ex)
 
     instruction = gen.send(None)
     assert isinstance(instruction, Acquire)
@@ -128,7 +142,7 @@ def test_permit_is_released_when_the_driver_abandons_the_generator() -> None:
 def test_bulkhead_permit_is_acquired_per_attempt_when_inner_to_retry() -> None:
     """Composed inside a retry, a bulkhead re-acquires per attempt (PLAN 8.7)."""
     sem = FifoSemaphore(1)
-    fs = Failsafe(Retry(max_retries=2), Bulkhead(sem), clock=FakeClock())
+    fs = Failsafe(RetryPolicy(max_retries=2), Bulkhead(sem), clock=FakeClock())
 
     assert fs.call(flaky(2)) == "ok"
     assert sem.used == 0
@@ -163,7 +177,7 @@ def test_each_async_task_sees_its_own_execution() -> None:
     """contextvars are per-task, so interleaved calls do not share an Execution."""
 
     async def scenario() -> None:
-        fs = AsyncFailsafe(Retry(max_retries=3))
+        fs = AsyncFailsafe(RetryPolicy(max_retries=3))
         gate = asyncio.Event()
 
         async def probe(failures: int) -> list[int]:
@@ -186,3 +200,56 @@ def test_each_async_task_sees_its_own_execution() -> None:
         assert await asyncio.gather(*tasks) == [[1], [1, 2, 3]]
 
     asyncio.run(scenario())
+
+
+def test_decorator_preserves_the_signature() -> None:
+    """D-4 and D-15: one object, usable as a decorator, with ParamSpec fidelity."""
+    import inspect
+
+    payments = Failsafe(RetryPolicy(max_retries=3), clock=FakeClock())
+    fn = flaky(2)
+
+    @payments
+    def charge(amount: int, *, currency: str = "EUR") -> str:
+        """Charge the customer."""
+        fn()
+        return f"{amount} {currency}"
+
+    assert charge(10, currency="USD") == "10 USD"
+    assert charge.__doc__ == "Charge the customer."
+    assert charge.__name__ == "charge"
+    assert list(inspect.signature(charge).parameters) == ["amount", "currency"]
+
+
+def test_async_decorator_preserves_the_signature() -> None:
+    apayments = AsyncFailsafe(RetryPolicy(max_retries=3), clock=FakeClock())
+    fn = aflaky(2)
+
+    @apayments
+    async def charge(amount: int) -> str:
+        """Charge the customer."""
+        await fn()
+        return f"{amount}"
+
+    assert asyncio.run(charge(10)) == "10"
+    assert charge.__doc__ == "Charge the customer."
+
+
+def test_decorated_functions_share_one_policy_set() -> None:
+    """The fragmentation hazard in D-4: one object, one breaker, many call sites."""
+    breaker = CircuitBreaker(failure_threshold=2, clock=FakeClock())
+    payments = Failsafe(breaker, clock=FakeClock())
+
+    @payments
+    def charge() -> str:
+        raise ConnectionError("down")
+
+    @payments
+    def refund() -> str:
+        raise ConnectionError("down")
+
+    with pytest.raises(ConnectionError):
+        charge()
+    with pytest.raises(ConnectionError):
+        refund()
+    assert breaker.is_open, "both call sites must feed the same breaker"

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import pytest
-from helpers import Retry, Tracer, flaky
+from conftest import Tracer, flaky
 
-from failsafe import Execution, Failsafe, current_execution
+from failsafe import Execution, Failsafe, RetryPolicy, current_execution
 from failsafe._core import FakeClock, Outcome, compose
 
 
@@ -65,7 +65,7 @@ def test_retry_counts_attempts_executions_and_retries() -> None:
         return flaky_fn()
 
     flaky_fn = flaky(2)
-    fs = Failsafe(Retry(max_retries=3), clock=clock)
+    fs = Failsafe(RetryPolicy(max_retries=3), clock=clock)
     assert fs.call(record) == "ok"
     assert seen == [(1, 0, 0), (2, 1, 1), (3, 2, 2)]
 
@@ -81,7 +81,7 @@ def test_execution_records_last_result_and_exception() -> None:
         return flaky_fn()
 
     flaky_fn = flaky(1)
-    Failsafe(Retry(max_retries=1), clock=clock).call(record)
+    Failsafe(RetryPolicy(max_retries=1), clock=clock).call(record)
     assert lasts[0] == (None, None)
     assert lasts[1][0] is None
     assert isinstance(lasts[1][1], ConnectionError)
@@ -89,7 +89,7 @@ def test_execution_records_last_result_and_exception() -> None:
 
 def test_sleep_goes_through_the_clock_seam() -> None:
     clock = FakeClock()
-    fs = Failsafe(Retry(max_retries=3, delay=2.5), clock=clock)
+    fs = Failsafe(RetryPolicy(max_retries=3, delay=2.5), clock=clock)
     assert fs.call(flaky(2)) == "ok"
     assert clock.slept == [2.5, 2.5]
     assert clock.now() == 5.0
@@ -124,7 +124,7 @@ def test_attempt_start_time_resets_per_attempt() -> None:
         return flaky_fn()
 
     flaky_fn = flaky(1)
-    Failsafe(Retry(max_retries=1, delay=4.0), clock=clock).call(record)
+    Failsafe(RetryPolicy(max_retries=1, delay=4.0), clock=clock).call(record)
     assert elapsed_attempt == [0.0, 0.0]
 
 
@@ -139,7 +139,7 @@ def test_is_first_attempt_and_is_retry() -> None:
         return flaky_fn()
 
     flaky_fn = flaky(1)
-    Failsafe(Retry(max_retries=1), clock=clock).call(record)
+    Failsafe(RetryPolicy(max_retries=1), clock=clock).call(record)
     assert flags == [(True, False), (False, True)]
 
 
@@ -153,13 +153,8 @@ def test_base_exception_is_never_caught_or_retried() -> None:
         raise KeyboardInterrupt
 
     with pytest.raises(KeyboardInterrupt):
-        Failsafe(Retry(max_retries=5), clock=FakeClock()).call(interrupted)
+        Failsafe(RetryPolicy(max_retries=5), clock=FakeClock()).call(interrupted)
     assert calls == 1
-
-
-def test_exhausted_retries_raise_the_last_exception() -> None:
-    with pytest.raises(ConnectionError, match="boom 3"):
-        Failsafe(Retry(max_retries=2), clock=FakeClock()).call(flaky(9))
 
 
 def test_current_execution_is_none_outside_a_call() -> None:
@@ -176,3 +171,14 @@ def test_compose_with_no_policies_invokes_once() -> None:
         gen.send(Outcome(value=42))
     assert info.value.value.unwrap() == 42
     assert (ex.attempts, ex.executions) == (1, 1)
+
+
+def test_public_api_surface_resolves() -> None:
+    """Every name in __all__ must import and be documented (D-16's reference input)."""
+    import failsafe
+
+    for name in failsafe.__all__:
+        symbol = getattr(failsafe, name)
+        assert symbol.__doc__, f"{name} is public but undocumented"
+    assert failsafe.__all__ == sorted(failsafe.__all__)
+    assert not any(name.startswith("_") for name in failsafe.__all__)

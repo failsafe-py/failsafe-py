@@ -42,6 +42,14 @@ start at the documentation site.
 7. `CancelledError` and other `BaseException`s are never treated as failures and never retried.
 8. `compose()` returns a new executor rather than mutating the receiver.
 9. No `with` form for permit policies; use `acquire_permit()` / `release_permit()`.
+10. **Listeners are lists, not single slots.** Go's `OnRetry(fn)` overwrites any previously
+    registered listener; ours appends, and every kwarg accepts a callable or a sequence of them.
+11. **`max_duration` is compared with `>=`, not Go's `>`.** Go only escapes a strict comparison
+    because its wall clock drifts past the budget; with an injected clock the retry delay is
+    clamped to land exactly on `max_duration`, and `>` would loop forever.
+12. **A callable `delay=` yields no delay for a manual breaker transition.** Go keeps `DelayFunc`
+    and `Delay` in separate fields, so `Open()` falls back to the fixed one. A single `delay=`
+    union has nothing to fall back to.
 
 ## One hazard worth stating plainly
 
