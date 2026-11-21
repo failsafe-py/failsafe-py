@@ -15,16 +15,20 @@ from ._events import (
     StateChangedEvent,
 )
 from ._exceptions import (
+    BulkheadFull,
     CircuitBreakerOpen,
     FailsafeError,
+    RateLimitExceeded,
     RetriesExceeded,
     ThrottleExceeded,
     TimeoutExceeded,
 )
 from ._sync import Failsafe
 from .adaptive_throttler import AdaptiveThrottler
+from .bulkhead import Bulkhead
 from .circuit_breaker import CircuitBreaker, Rate, Ratio
 from .fallback import Fallback
+from .rate_limiter import RateLimiter
 from .retry import RetryPolicy
 from .timeout import Timeout
 
@@ -32,6 +36,8 @@ __all__ = [
     "AdaptiveThrottler",
     "AsyncFailsafe",
     "Backoff",
+    "Bulkhead",
+    "BulkheadFull",
     "CircuitBreaker",
     "CircuitBreakerOpen",
     "Condition",
@@ -46,6 +52,8 @@ __all__ = [
     "Jitter",
     "RandomDelay",
     "Rate",
+    "RateLimitExceeded",
+    "RateLimiter",
     "Ratio",
     "Result",
     "RetriesExceeded",

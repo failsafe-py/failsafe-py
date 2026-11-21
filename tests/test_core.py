@@ -182,3 +182,17 @@ def test_public_api_surface_resolves() -> None:
         assert symbol.__doc__, f"{name} is public but undocumented"
     assert failsafe.__all__ == sorted(failsafe.__all__)
     assert not any(name.startswith("_") for name in failsafe.__all__)
+
+
+def test_every_public_symbol_is_exported() -> None:
+    """The reverse of the above: an import that never reaches __all__ is invisible."""
+    import failsafe
+
+    missing = [
+        name
+        for name, symbol in vars(failsafe).items()
+        if not name.startswith("_")
+        and getattr(symbol, "__module__", "").startswith("failsafe")
+        and name not in failsafe.__all__
+    ]
+    assert not missing, f"public but not in __all__: {missing}"

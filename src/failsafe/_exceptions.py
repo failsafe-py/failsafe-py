@@ -5,8 +5,10 @@ from __future__ import annotations
 from typing import Any
 
 __all__ = [
+    "BulkheadFull",
     "CircuitBreakerOpen",
     "FailsafeError",
+    "RateLimitExceeded",
     "RetriesExceeded",
     "ThrottleExceeded",
     "TimeoutExceeded",
@@ -86,3 +88,27 @@ class ThrottleExceeded(FailsafeError):
     def __init__(self, rejection_rate: float = 0.0) -> None:
         super().__init__(f"throttled (rejection rate: {rejection_rate:.3f})")
         self.rejection_rate = rejection_rate
+
+
+class RateLimitExceeded(FailsafeError):
+    """A :class:`~failsafe.RateLimiter` refused a permit within its max wait time.
+
+    Attributes:
+        max_wait_time: The longest the execution was willing to wait, in seconds.
+    """
+
+    def __init__(self, max_wait_time: float = 0.0) -> None:
+        super().__init__(f"rate limit exceeded (max wait: {max_wait_time:.3f}s)")
+        self.max_wait_time = max_wait_time
+
+
+class BulkheadFull(FailsafeError):
+    """A :class:`~failsafe.Bulkhead` had no permit free within its max wait time.
+
+    Attributes:
+        max_concurrency: The number of executions the bulkhead permits at once.
+    """
+
+    def __init__(self, max_concurrency: int = 0) -> None:
+        super().__init__(f"bulkhead full (max concurrency: {max_concurrency})")
+        self.max_concurrency = max_concurrency

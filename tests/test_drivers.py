@@ -10,11 +10,13 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-from conftest import Bulkhead, aflaky, flaky
+from conftest import aflaky, flaky
 
 from failsafe import (
     AsyncFailsafe,
     Backoff,
+    Bulkhead,
+    BulkheadFull,
     CircuitBreaker,
     CircuitBreakerOpen,
     Failsafe,
@@ -22,7 +24,6 @@ from failsafe import (
     current_execution,
 )
 from failsafe._core import Acquire, Execution, FakeClock, compose
-from failsafe._semaphore import FifoSemaphore
 
 
 def test_policy_state_is_shared_between_drivers() -> None:
@@ -102,7 +103,7 @@ def test_cancelled_error_is_not_retried() -> None:
 
 def test_task_cancellation_propagates_and_releases_permits() -> None:
     """Cancelling mid-execution must unwind the generators, not strand a permit."""
-    sem = FifoSemaphore(1)
+    bulkhead = Bulkhead(1)
     started = asyncio.Event()
 
     async def hang() -> str:
@@ -111,49 +112,49 @@ def test_task_cancellation_propagates_and_releases_permits() -> None:
         return "never"
 
     async def scenario() -> None:
-        fs = AsyncFailsafe(Bulkhead(sem), RetryPolicy(max_retries=5))
+        fs = AsyncFailsafe(bulkhead, RetryPolicy(max_retries=5))
         task = asyncio.ensure_future(fs.call(hang))
         await started.wait()
-        assert sem.used == 1
+        assert bulkhead.used == 1
 
         task.cancel()
         with pytest.raises(asyncio.CancelledError):
             await task
-        assert sem.used == 0
+        assert bulkhead.used == 0
 
     asyncio.run(scenario())
 
 
 def test_permit_is_released_when_the_driver_abandons_the_generator() -> None:
     """The driver may stop pumping at any instruction; finally must still run."""
-    sem = FifoSemaphore(1)
+    bulkhead = Bulkhead(1)
     ex = Execution(FakeClock())
-    gen = compose((Bulkhead(sem), RetryPolicy(max_retries=1, delay=1.0)))(ex)
+    gen = compose((bulkhead, RetryPolicy(max_retries=1, delay=1.0)))(ex)
 
     instruction = gen.send(None)
     assert isinstance(instruction, Acquire)
-    gen.send(sem.acquire(instruction.timeout))  # advances to the first Invoke
-    assert sem.used == 1
+    gen.send(instruction.semaphore.acquire(instruction.timeout))  # to the first Invoke
+    assert bulkhead.used == 1
 
     gen.close()
-    assert sem.used == 0
+    assert bulkhead.used == 0
 
 
 def test_bulkhead_permit_is_acquired_per_attempt_when_inner_to_retry() -> None:
     """Composed inside a retry, a bulkhead re-acquires per attempt (PLAN 8.7)."""
-    sem = FifoSemaphore(1)
-    fs = Failsafe(RetryPolicy(max_retries=2), Bulkhead(sem), clock=FakeClock())
+    bulkhead = Bulkhead(1)
+    fs = Failsafe(RetryPolicy(max_retries=2), bulkhead, clock=FakeClock())
 
     assert fs.call(flaky(2)) == "ok"
-    assert sem.used == 0
+    assert bulkhead.used == 0
 
 
 def test_blocked_permit_surfaces_as_a_policy_failure() -> None:
-    sem = FifoSemaphore(1)
-    assert sem.acquire(timeout=0)
-    fs = Failsafe(Bulkhead(sem, timeout=0), clock=FakeClock())
+    bulkhead = Bulkhead(1)
+    assert bulkhead.try_acquire_permit()
+    fs = Failsafe(bulkhead, clock=FakeClock())
 
-    with pytest.raises(RuntimeError, match="bulkhead full"):
+    with pytest.raises(BulkheadFull, match="bulkhead full"):
         fs.call(lambda: "never")
 
 

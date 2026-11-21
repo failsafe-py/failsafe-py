@@ -513,10 +513,10 @@ Implications:
 from failsafe import (
     Failsafe, AsyncFailsafe, current_execution,
     RetryPolicy, CircuitBreaker, Timeout, Fallback, Bulkhead, RateLimiter,
-    HedgePolicy, CachePolicy, Budget,
+    AdaptiveThrottler, HedgePolicy, CachePolicy, Budget,
     Fixed, Backoff, RandomDelay, Jitter, Ratio, Rate, Result, Condition,
     RetriesExceeded, CircuitBreakerOpen, TimeoutExceeded, BulkheadFull,
-    RateLimitExceeded, BudgetExceeded,
+    RateLimitExceeded, ThrottleExceeded, BudgetExceeded,
 )
 
 retry = RetryPolicy(
@@ -551,6 +551,20 @@ try:
     ...
 finally:
     bulkhead.release_permit()
+```
+
+HTTP, via the optional `failsafe-py[httpx]` extra:
+
+```python
+import httpx
+from failsafe.httpx import FailsafeTransport, is_retryable, retry_policy, retry_after_delay
+
+# a Response is the execution result, so conditions inspect it rather than compare it:
+# Result(429) would ask whether the response *equals* 429, which it never does
+breaker = CircuitBreaker(handle=is_retryable, delay=retry_after_delay)
+
+# retry_policy() knows which HTTP failures are worth retrying, and honours Retry-After
+client = httpx.Client(transport=FailsafeTransport(retry_policy(max_retries=3), breaker))
 ```
 
 `Execution` (from Go's `ExecutionInfo` / `ExecutionAttempt`): `attempts`, `executions`, `retries`,
@@ -623,6 +637,29 @@ Each is a porting requirement.
     rate strictly below 1 at low execution counts, so a handful of failures cannot wedge a
     resource shut. `max_rejection_rate` then caps it, defaulting to `.9` so a recovering backend
     always receives probe traffic.
+11. **Rate limiter arithmetic runs in integer nanoseconds.** Go's `time.Duration` is an
+    `int64` of nanoseconds, and the reservation maths leans on exact integer division:
+    `RoundDown(current, interval)` for smooth, `current / period` for bursty. In float
+    seconds `0.3 / 0.1` lands just under 3, silently dropping a period. The port keeps a
+    nanosecond integer internally and converts at the boundary.
+12. **A smooth limiter reserves the *interval before* the permit, not after.** The wait is
+    `next_free - now - interval`, so the first caller of an idle limiter waits zero while
+    still pushing `next_free` a full interval out. Dropping the `- interval` term makes
+    every caller wait one interval too many, including the first.
+13. **Bursty available permits go negative.** A burst of 10 against a limit of 2 leaves a
+    deficit of -8, and later callers wait several periods for it to drain. `additional_units
+    == 0` then decrements `additional_periods`, because a caller using none of a period's
+    permits must not wait for it.
+14. **`max_wait_time` is executor-only.** Go's `AcquirePermit` blocks indefinitely, while the
+    executor calls `AcquirePermitWithMaxWait(ctx, maxWaitTime)`. A standalone caller that
+    wants a bound uses `try_reserve_permit(max_wait)`. Preserved deliberately; it reads like
+    an inconsistency until you see both call sites.
+15. **`httpx.MockTransport` cannot witness a broken request-body rewind.** Its
+    `handle_request` calls `request.read()` *before* the handler, which buffers a streaming
+    body back onto the request and makes the retry succeed whether or not the transport
+    rewound anything. Body-rewind tests use a plain `BaseTransport` that drains
+    `request.stream`. A mutation test (remove the buffering, watch the second attempt send
+    `b""`) is the only proof that the test is load-bearing.
 
 ---
 
@@ -663,7 +700,7 @@ Go uses `testing/synctest` for a virtual clock; the equivalent here is an inject
 | 0 | CI (ruff + mypy strict + pytest on 3.11–3.14), `_core`, `Execution`, `Outcome`, both drivers, fake clock | **done** |
 | 1 | `RetryPolicy`, `Fallback`, `Timeout`, `CircuitBreaker`, composition, events | **done** — `0.1`; Go's retry + breaker corpus ported and passing |
 | 2 | `AdaptiveThrottler` | **done** — `0.2`; Go's throttler corpus ported and passing |
-| 3 | `RateLimiter`, `Bulkhead`, `failsafe.httpx` client | `0.3`; body-rewind and streaming-cancellation tests pass |
+| 3 | `RateLimiter`, `Bulkhead`, `failsafe.httpx` client | **done** — `0.3`; Go's rate limiter and bulkhead corpora ported, body rewind pinned by mutation test |
 | 4 | `failsafe-py.dev` site + API reference on Read the Docs | `0.4` |
 | 5 | `AdaptiveLimiter`, `priority`, prioritized variants | `0.5` |
 | 6 | `HedgePolicy` (async only), `CachePolicy`, `Budget` | `0.6` |
