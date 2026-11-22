@@ -29,17 +29,11 @@ class Timeout:
     [`RetryPolicy`][failsafe.RetryPolicy] can retry it. An `asyncio.CancelledError`
     cannot: that is terminal.
 
-    **Sync mode is cooperative by default.** Python cannot interrupt a running call, so
-    the limit is enforced between instructions, and a function that blocks for a minute
-    under a one-second timeout still blocks for a minute. ``interrupt=True`` runs the
-    attempt on a worker thread and frees the caller on time, at the cost of leaving
-    that thread running to completion. Async mode always interrupts, via
-    `asyncio.timeout`.
-
     Args:
         timeout: The limit, in seconds or as a timedelta.
-        interrupt: Run sync attempts on a worker thread so the caller is freed on time.
-            Ignored in async mode, which always interrupts.
+        interrupt: Run sync attempts on a worker thread so the caller is freed on time,
+            at the cost of leaving that thread running to completion. Ignored in async
+            mode, which always interrupts.
         on_timeout: Called when the limit is exceeded.
 
     Raises:
