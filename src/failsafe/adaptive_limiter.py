@@ -267,8 +267,20 @@ class AdaptiveLimiter:
             raise ValueError("max_limit_factor must be at least 1")
         if not 0 <= recent_quantile <= 1:
             raise ValueError("recent_quantile must be between 0 and 1")
+        if max_limit_factor_decay < 0:
+            raise ValueError("max_limit_factor_decay must not be negative")
+        if not 1 <= min_limit_factor <= max_limit_factor:
+            raise ValueError("min_limit_factor must be between 1 and max_limit_factor")
+        if recent_window_min_samples <= 0:
+            raise ValueError("recent_window_min_samples must be positive")
+        if baseline_window_age <= 0:
+            raise ValueError("baseline_window_age must be positive")
+        if correlation_window_size <= 0:
+            raise ValueError("correlation_window_size must be positive")
         min_duration = seconds(recent_window_min_duration)
         max_duration = seconds(recent_window_max_duration)
+        if min_duration <= 0 or max_duration <= 0:
+            raise ValueError("recent window durations must be positive")
         if min_duration > max_duration:
             raise ValueError("recent_window_min_duration must not exceed its max")
         stabilization = seconds(max_limit_stabilization_window)

@@ -188,6 +188,21 @@ def test_async_timeout_really_interrupts() -> None:
     asyncio.run(scenario())
 
 
+def test_async_timeout_does_not_swallow_user_timeout_error() -> None:
+    error = TimeoutError("user timeout")
+
+    async def fails() -> None:
+        raise error
+
+    async def scenario() -> None:
+        with pytest.raises(TimeoutError) as info:
+            await AsyncFailsafe(Timeout(10.0)).call(fails)
+        assert info.value is error
+
+    asyncio.run(scenario())
+
+
+
 def test_async_timeout_abandons_inner_retries() -> None:
     attempts = 0
 

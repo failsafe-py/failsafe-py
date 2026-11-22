@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import contextvars
-from collections.abc import Callable, Generator, Iterator
+from collections.abc import Callable, Generator, Hashable, Iterator
 from typing import Any, Protocol
 
 from ._conditions import UNSET, Condition, FailureConditions
@@ -13,17 +13,15 @@ from ._events import ExecutionCompletedEvent, ExecutionEvent, Listener, Listener
 
 __all__ = ["Cache", "CachePolicy", "cache_key", "current_cache_key"]
 
-_CACHE_KEY: contextvars.ContextVar[str] = contextvars.ContextVar("failsafe_cache_key")
+_CACHE_KEY: contextvars.ContextVar[Hashable] = contextvars.ContextVar("failsafe_cache_key")
 
 
 @contextlib.contextmanager
-def cache_key(key: str) -> Iterator[None]:
+def cache_key(key: Hashable) -> Iterator[None]:
     """Set the cache key for the enclosed block, overriding a policy's ``key=``.
 
-    Go reads its cache key from the `Context`; this is the equivalent, and the same
-    ambient mechanism [`priority_scope`][failsafe.priority_scope] uses. Reach for it
-    when the key belongs to the request rather than to the arguments — a tenant, a
-    revision, a trace:
+    Use this when the key belongs to request context rather than to the function's
+    arguments:
 
     ```python
     with cache_key(f"{tenant}:config"):
@@ -40,27 +38,23 @@ def cache_key(key: str) -> Iterator[None]:
         _CACHE_KEY.reset(token)
 
 
-def current_cache_key() -> str | None:
+def current_cache_key() -> Hashable | None:
     """Return the cache key in scope, or ``None``."""
     return _CACHE_KEY.get(None)
 
 
 class Cache(Protocol):
-    """The two operations a cache backend must provide.
+    """A mutable cache backend.
 
-    Structural, so a `dict` subclass, an LRU, or a Redis wrapper all satisfy it
-    without importing anything from this library. Implementations are responsible for
-    their own eviction, expiry and thread safety.
+    Any mapping, including `dict` and `cachetools` caches, satisfies this protocol.
+    Backends are responsible for eviction, expiry and thread safety.
     """
 
-    def get(self, key: str) -> tuple[Any, bool]:
-        """Return the value for ``key`` and whether it was present.
-
-        The flag distinguishes a missing entry from a cached ``None``.
-        """
+    def __getitem__(self, key: Any) -> Any:
+        """Return the cached value, or raise `KeyError` if absent."""
         ...
 
-    def set(self, key: str, value: Any) -> None:
+    def __setitem__(self, key: Any, value: Any) -> None:
         """Store ``value`` under ``key``."""
         ...
 
@@ -109,7 +103,7 @@ class CachePolicy:
         self,
         cache: Cache,
         *,
-        key: Callable[..., str | None] | None = None,
+        key: Callable[..., Hashable | None] | None = None,
         cache_if: Condition = UNSET,
         on_hit: Listener | None = None,
         on_miss: Listener | None = None,
@@ -131,8 +125,11 @@ class CachePolicy:
         def step(ex: Execution) -> Generator[Instruction, Any, Outcome[Any]]:
             key = self._resolve_key(ex)
             if key is not None:
-                value, found = self._cache.get(key)
-                if found:
+                try:
+                    value = self._cache[key]
+                except KeyError:
+                    pass
+                else:
                     if self.on_hit:
                         self.on_hit.emit(ExecutionCompletedEvent(ex, value, None))
                     return Outcome(value=value)
@@ -142,14 +139,14 @@ class CachePolicy:
             outcome = yield from inner(ex)
 
             if key is not None and self._should_cache(outcome):
-                self._cache.set(key, outcome.value)
+                self._cache[key] = outcome.value
                 if self.on_cached:
                     self.on_cached.emit(ExecutionEvent(ex, outcome.value, outcome.exc))
             return outcome
 
         return step
 
-    def _resolve_key(self, ex: Execution) -> str | None:
+    def _resolve_key(self, ex: Execution) -> Hashable | None:
         """The cache key for this execution, or ``None`` to skip the cache.
 
         A surrounding [`cache_key`][failsafe.cache_key] block wins over ``key=``,

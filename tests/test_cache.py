@@ -28,12 +28,10 @@ class DictCache:
         self.store: dict[str, Any] = {}
         self.sets = 0
 
-    def get(self, key: str) -> tuple[Any, bool]:
-        if key in self.store:
-            return self.store[key], True
-        return None, False
+    def __getitem__(self, key: str) -> Any:
+        return self.store[key]
 
-    def set(self, key: str, value: Any) -> None:
+    def __setitem__(self, key: str, value: Any) -> None:
         self.store[key] = value
         self.sets += 1
 
@@ -117,6 +115,21 @@ def test_a_cached_none_is_a_hit() -> None:
     assert failsafe.call(fetch, "k") is None
     assert failsafe.call(fetch, "k") is None
     assert calls == [1]
+
+
+def test_a_plain_dict_is_a_backend() -> None:
+    cache: dict[str, Any] = {}
+    calls = 0
+
+    def fetch(key: str) -> None:
+        nonlocal calls
+        calls += 1
+
+    failsafe = Failsafe(CachePolicy(cache, key=lambda key: key), clock=FakeClock())
+
+    assert failsafe.call(fetch, "k") is None
+    assert failsafe.call(fetch, "k") is None
+    assert calls == 1
 
 
 def test_a_failure_is_not_cached() -> None:
