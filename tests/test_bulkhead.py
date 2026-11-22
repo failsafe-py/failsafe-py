@@ -122,33 +122,6 @@ def test_retry_reacquires_a_permit_per_attempt() -> None:
     assert bulkhead.used == 0
 
 
-def test_permit_is_released_when_an_interrupted_attempt_finishes() -> None:
-    """An interrupting timeout frees the caller, not the worker thread.
-
-    Python cannot kill the abandoned thread, so the permit stays held until the slow
-    call returns on its own; the generator's ``finally`` then releases it.
-    """
-    from failsafe import Timeout, TimeoutExceeded
-
-    bulkhead = Bulkhead(1)
-    may_finish = threading.Event()
-    finished = threading.Event()
-
-    def slow() -> str:
-        may_finish.wait(5.0)
-        finished.set()
-        return "late"
-
-    with pytest.raises(TimeoutExceeded):
-        Failsafe(Timeout(0.02, interrupt=True), bulkhead).call(slow)
-
-    assert bulkhead.used == 1, "the worker still holds it; the thread cannot be killed"
-
-    may_finish.set()
-    assert finished.wait(5.0), "the abandoned attempt ran to completion"
-    assert bulkhead.await_released(5.0), "released once the abandoned attempt returned"
-
-
 def test_concurrent_executions_are_capped() -> None:
     """The whole point: never more than max_concurrency running at once."""
     bulkhead = Bulkhead(3, max_wait_time=5.0)

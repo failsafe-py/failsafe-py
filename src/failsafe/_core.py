@@ -345,13 +345,12 @@ class Race:
     instruction rather than policy code:
 
     - async interrupts the attempt mid-await via `asyncio.timeout`;
-    - sync is cooperative, checking the deadline between instructions, unless
-      ``interrupt`` asks for a worker thread.
+    - sync is cooperative, checking the deadline between instructions, so a blocking
+      call runs to completion and the deadline is observed once it returns.
     """
 
     inner: Any
     seconds: float
-    interrupt: bool = False
 
 
 class HedgeControl(Protocol):
