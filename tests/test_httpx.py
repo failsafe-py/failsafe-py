@@ -19,6 +19,7 @@ from failsafe import (
     Bulkhead,
     CircuitBreaker,
     RetryPolicy,
+    Timeout,
 )
 from failsafe._core import FakeClock
 from failsafe.httpx import (
@@ -356,3 +357,41 @@ def test_retry_policy_defaults_are_overridable() -> None:
     with client(retry_policy(max_retries=1, delay=None), handler=handler) as http:
         assert http.get("http://example.test/").status_code == 500
     assert len(sent) == 2, "max_retries=1 means two attempts"
+
+
+def test_the_policy_deadline_reaches_httpx() -> None:
+    """A sync Timeout bounds the round trip, not just what gets reported.
+
+    httpx cannot be interrupted mid-request, so the deadline only becomes real if the
+    transport hands it over. It goes into ``request.extensions["timeout"]``, which is
+    this transport's equivalent of the request context failsafe-go threads per attempt.
+    """
+    seen: list[dict[str, float]] = []
+
+    class Recording(httpx.BaseTransport):
+        def handle_request(self, request: httpx.Request) -> httpx.Response:
+            seen.append(request.extensions["timeout"])
+            return httpx.Response(200)
+
+    transport = FailsafeTransport(Timeout(2.0), transport=Recording())
+    httpx.Client(transport=transport, timeout=30.0).get("http://x/")
+
+    assert seen, "the inner transport ran"
+    assert all(value == pytest.approx(2.0, abs=0.1) for value in seen[0].values()), (
+        f"every phase narrowed to the policy budget, got {seen[0]}"
+    )
+
+
+def test_a_stricter_client_timeout_is_not_widened() -> None:
+    """The budget narrows each phase; it never relaxes what the caller asked for."""
+    seen: list[dict[str, float]] = []
+
+    class Recording(httpx.BaseTransport):
+        def handle_request(self, request: httpx.Request) -> httpx.Response:
+            seen.append(request.extensions["timeout"])
+            return httpx.Response(200)
+
+    transport = FailsafeTransport(Timeout(30.0), transport=Recording())
+    httpx.Client(transport=transport, timeout=0.5).get("http://x/")
+
+    assert seen[0]["read"] == pytest.approx(0.5), f"client's stricter value kept, got {seen[0]}"
