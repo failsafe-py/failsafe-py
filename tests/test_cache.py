@@ -14,7 +14,6 @@ from failsafe import (
     ExecutionCompletedEvent,
     ExecutionEvent,
     Failsafe,
-    Result,
     RetryPolicy,
 )
 from failsafe._core import FakeClock
@@ -135,7 +134,7 @@ def test_a_failure_is_not_cached() -> None:
 def test_cache_if_narrows_what_is_stored() -> None:
     """Go TestCache/with condition."""
     cache = DictCache()
-    policy = CachePolicy(cache, key=lambda k: k, cache_if=Result("bar"))
+    policy = CachePolicy(cache, key=lambda k: k, cache_if="bar")
     failsafe = Failsafe(policy, clock=FakeClock())
 
     assert failsafe.call(lambda k: "bar", "matching") == "bar"

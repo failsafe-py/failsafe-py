@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 
-from ._conditions import Condition, FailureConditions
+from ._conditions import UNSET, Condition, FailureConditions
 from ._core import SYSTEM_CLOCK, Clock, Execution, Instruction, Outcome, Step
 from ._delays import seconds
 from ._events import ExecutionEvent, Listener, Listeners
@@ -172,7 +172,7 @@ class AdaptiveThrottler:
         execution_threshold: int = 0,
         thresholding_period: float | timedelta = 60.0,
         max_rejection_rate: float = 0.9,
-        handle: Condition | None = None,
+        handle: Condition = UNSET,
         on_success: Listener | None = None,
         on_failure: Listener | None = None,
         clock: Clock = SYSTEM_CLOCK,

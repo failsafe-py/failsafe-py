@@ -12,7 +12,7 @@ start at the documentation site.
 | `failsafe.With(...).RunAsync(fn)` | `asyncio.create_task(AsyncFailsafe(...).call(fn))` |
 | `retrypolicy.NewBuilder[R]().WithMaxRetries(3).Build()` | `RetryPolicy(max_retries=3)` |
 | `.HandleErrors(e)` / `.HandleErrorTypes(e)` | `handle=SomeError` |
-| `.HandleResult(v)` | `handle=Result(v)` |
+| `.HandleResult(v)` | `handle=v` (or `handle=Result(v)` inside a list) |
 | `.HandleIf(pred)` | `handle=lambda result, exc: ...` |
 | `.AbortOnErrors(e)` / `.AbortIf(pred)` | `abort=SomeError` / `abort=lambda r, e: ...` |
 | `.WithDelay(d)` | `delay=1.0` |
@@ -150,6 +150,13 @@ start at the documentation site.
     "the current combined rate of retries and hedges". The docs page is stale against its own
     source; this port follows the source. The `kind` on `BudgetExceededEvent` is what tells
     retries and hedges apart.
+42. **A bare value is a result condition; ambiguous shapes are rejected rather than
+    guessed.** Go needs no such rule because `HandleResult(v)` is its own builder method.
+    Here one keyword carries every condition kind, so `handle="bad"` and `handle=None`
+    work directly, while a bare value *inside* a collection raises `TypeError` — a
+    collection already means "any of these conditions". `Result(v)` remains for values
+    that are tuples, lists or callables, and for collection members. An empty collection
+    also raises, since it matches nothing.
 
 ## One hazard worth stating plainly
 

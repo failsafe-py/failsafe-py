@@ -18,7 +18,6 @@ import pytest
 from failsafe import (
     Bulkhead,
     CircuitBreaker,
-    Result,
     RetryPolicy,
 )
 from failsafe._core import FakeClock
@@ -282,7 +281,7 @@ def _execution_with(response: httpx.Response | None):  # type: ignore[no-untyped
 def test_circuit_breaker_opens_and_rejects_without_a_request() -> None:
     """A rejected execution never reaches the transport."""
     handler, sent = responder(500, 500, 500, 200)
-    breaker = CircuitBreaker(failure_threshold=2, handle=Result(None), delay=60.0)
+    breaker = CircuitBreaker(failure_threshold=2, handle=None, delay=60.0)
     breaker.open()
 
     transport = FailsafeTransport(breaker, transport=handler)

@@ -7,7 +7,7 @@ from collections.abc import Callable, Generator
 from datetime import timedelta
 from typing import Any
 
-from ._conditions import Condition, FailureConditions
+from ._conditions import UNSET, Condition, FailureConditions
 from ._core import Execution, Hedge, Instruction, Outcome, Step
 from ._delays import seconds
 from ._events import ExecutionEvent, Listener, Listeners
@@ -93,7 +93,7 @@ class HedgePolicy:
         quantile_age: int = 30,
         warmup: int = 20,
         max_hedges: int = 1,
-        cancel_on: Condition | None = None,
+        cancel_on: Condition = UNSET,
         budget: Budget | None = None,
         on_hedge: Listener | None = None,
     ) -> None:
@@ -114,7 +114,7 @@ class HedgePolicy:
             None if quantile is None else MovingQuantile(quantile, _QUANTILE_STEP, quantile_age)
         )
         self._warmup = warmup
-        self._accept = FailureConditions(cancel_on) if cancel_on is not None else None
+        self._accept = FailureConditions(cancel_on) if cancel_on is not UNSET else None
         self.max_hedges = max_hedges
         """How many extra attempts may be started."""
         self.budget = budget

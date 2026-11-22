@@ -251,30 +251,71 @@ def test_handle_matches_an_exception_group_leaf(clock: FakeClock) -> None:
         Failsafe(policy, clock=clock).call(fn)
 
 
-def test_a_bare_value_condition_is_rejected_with_a_pointer_to_result() -> None:
-    """Iterating a str yields str, so compiling one recursed until the stack blew.
+def test_a_bare_value_is_a_result_condition(clock: FakeClock) -> None:
+    """The common case needs no wrapper: handle=<value> matches that return."""
+    results = iter(["bad", "bad", "good"])
+    policy = RetryPolicy(handle="bad", max_retries=5)
+    assert Failsafe(policy, clock=clock).call(lambda: next(results)) == "good"
 
-    A str satisfies the condition type while an int does not, which is why the string
-    case reached the compiler and crashed instead of being rejected outright.
-    """
+
+def test_handle_none_matches_a_none_return(clock: FakeClock) -> None:
+    """The case a plain None default could not express: None as a failure value."""
+    results = iter([None, None, "good"])
+    policy = RetryPolicy(handle=None, max_retries=5)
+    assert Failsafe(policy, clock=clock).call(lambda: next(results)) == "good"
+
+
+def test_an_omitted_condition_still_means_any_exception(clock: FakeClock) -> None:
+    """Omission must stay distinguishable from handle=None."""
+    policy = RetryPolicy(max_retries=5)
+    assert Failsafe(policy, clock=clock).call(flaky(2)) == "ok"
+    # A None return is a success when no condition was configured.
+    assert Failsafe(RetryPolicy(max_retries=1), clock=clock).call(lambda: None) is None
+
+
+def test_a_bare_value_inside_a_collection_is_rejected() -> None:
+    """A collection already means "any of these", so a bare member is ambiguous."""
     with pytest.raises(TypeError, match=r"Result\('bad'\)"):
-        RetryPolicy(handle="bad")
-    with pytest.raises(TypeError, match=r"Result\(b'bad'\)"):
-        RetryPolicy(handle=b"bad")
-    with pytest.raises(TypeError, match=r"Result\(429\)"):
-        RetryPolicy(handle=429)  # type: ignore[arg-type]
+        RetryPolicy(handle=["bad", ConnectionError])
+    with pytest.raises(TypeError, match=r"Result\(1\)"):
+        RetryPolicy(handle=[1, 2, 3])
+
+
+def test_an_empty_collection_is_rejected() -> None:
+    """Matching nothing is never what the caller meant."""
+    with pytest.raises(TypeError, match="empty collection"):
+        RetryPolicy(handle=[])
+    with pytest.raises(TypeError, match="empty collection"):
+        RetryPolicy(handle=())
+
+
+def test_a_tuple_follows_the_collection_rule(clock: FakeClock) -> None:
+    """A tuple already means exception types, so a bare member is ambiguous there too."""
+    with pytest.raises(TypeError, match=r"Result\(1\)"):
+        RetryPolicy(handle=(1, 2))
+    # Matching a returned tuple is still reachable, through the wrapper.
+    results = iter([(1, 2), "done"])
+    policy = RetryPolicy(handle=Result((1, 2)), max_retries=3)
+    assert Failsafe(policy, clock=clock).call(lambda: next(results)) == "done"
+
+
+def test_a_mapping_or_set_value_needs_no_wrapper(clock: FakeClock) -> None:
+    """Neither is a Sequence, so neither collides with the collection reading."""
+    results = iter([{"a": 1}, "done"])
+    policy = RetryPolicy(handle={"a": 1}, max_retries=3)
+    assert Failsafe(policy, clock=clock).call(lambda: next(results)) == "done"
 
 
 def test_handle_result_retries_a_value(clock: FakeClock) -> None:
     """Go HandleResult: a returned value counts as a failure."""
     results = iter(["bad", "bad", "good"])
-    policy = RetryPolicy(handle=Result("bad"), max_retries=5)
+    policy = RetryPolicy(handle="bad", max_retries=5)
     assert Failsafe(policy, clock=clock).call(lambda: next(results)) == "good"
 
 
 def test_result_condition_does_not_replace_default_error_handling(clock: FakeClock) -> None:
-    """Go's errorsChecked: handle=Result(x) keeps errors failing."""
-    policy = RetryPolicy(handle=Result("bad"), max_retries=2)
+    """Go's errorsChecked: handle=x keeps errors failing."""
+    policy = RetryPolicy(handle="bad", max_retries=2)
     with pytest.raises(RetriesExceeded):
         Failsafe(policy, clock=clock).call(flaky(9))
 
@@ -332,13 +373,13 @@ def test_abort_stops_retrying_with_the_failure(clock: FakeClock) -> None:
 
 def test_abort_only_applies_to_outcomes_that_are_failures(clock: FakeClock) -> None:
     """Go: abort is evaluated inside OnFailure, so a success never aborts."""
-    policy = RetryPolicy(abort=Result("ok"), max_retries=3)
+    policy = RetryPolicy(abort="ok", max_retries=3)
     assert Failsafe(policy, clock=clock).call(lambda: "ok") == "ok"
 
 
 def test_abort_on_a_result_value(clock: FakeClock) -> None:
     results = iter(["bad", "fatal", "never"])
-    policy = RetryPolicy(handle=Result("bad"), abort=Result("fatal"), max_retries=9)
+    policy = RetryPolicy(handle="bad", abort="fatal", max_retries=9)
     # "fatal" is not a failure under handle, so it is simply returned.
     assert Failsafe(policy, clock=clock).call(lambda: next(results)) == "fatal"
 

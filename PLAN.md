@@ -247,17 +247,23 @@ errors. Python has `isinstance`:
 
 ```python
 Condition = (
-    type[Exception] | tuple[type[Exception], ...]   # exception types (errors.Is + errors.As)
-    | Result(value)                                  # a result value (HandleResult)
+    type[Exception]                                  # exception type (errors.Is + errors.As)
+    | tuple[type[Exception], ...] | list[...]        # OR'ed exception types
     | Callable[[R | None, Exception | None], bool]   # arbitrary predicate (HandleIf)
-    | Sequence[Condition]                            # OR'ed, as in Go
+    | Any                                            # any other value (HandleResult)
+    | Result(value)                                  # a value that reads as one of the above
 )
 ```
 
-`handle: Condition = Exception` keeps Go's default (any error is a failure). The explicit
-`Result(...)` wrapper disambiguates "match this value" from "match this exception type", which is
-what would otherwise force a separate `handle_result=` parameter — `handle=None` is ambiguous
-between "no condition" and "treat `None` as a failure".
+Bare values are the common spelling: `handle="bad"`, `handle=None`, `handle=429`. The default
+is a private `UNSET` sentinel rather than `None`, since `handle=None` has to mean "a `None`
+return is a failure" and would otherwise be indistinguishable from omitting the argument.
+
+`Result(...)` survives for the three shapes a bare value cannot take, because each already
+means something: a tuple or list (exception types, OR'ed conditions) and anything callable
+(a predicate). Inside a collection every member must be an exception type or a `Result`, since
+a collection already means "any of these"; a bare value there raises `TypeError`, as does an
+empty collection.
 
 The same type is reused wherever Go has a condition family: `abort=` on retry, `cancel_on=` on
 hedge, `cache_if=` on cache. Four builder families, one concept.

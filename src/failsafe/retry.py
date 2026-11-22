@@ -7,7 +7,7 @@ from collections.abc import Generator
 from datetime import timedelta
 from typing import Any
 
-from ._conditions import Condition, FailureConditions
+from ._conditions import UNSET, Condition, FailureConditions
 from ._core import Execution, Instruction, Outcome, Sleep, Step
 from ._delays import Delay, compile_delay, seconds
 from ._events import ExecutionEvent, Listener, Listeners, ScheduledRetryEvent
@@ -36,7 +36,7 @@ class RetryPolicy:
 
     Args:
         handle: What counts as a failure worth retrying. Defaults to any exception.
-            A result-only condition such as ``Result(None)`` adds to the default rather
+            A result-only condition such as ``handle=None`` adds to the default rather
             than replacing it, matching Go.
         abort: What should stop retrying immediately, failing with that result rather
             than :exc:`~failsafe.RetriesExceeded`. Only evaluated for outcomes that
@@ -88,8 +88,8 @@ class RetryPolicy:
     def __init__(
         self,
         *,
-        handle: Condition | None = None,
-        abort: Condition | None = None,
+        handle: Condition = UNSET,
+        abort: Condition = UNSET,
         delay: Delay | None = None,
         max_retries: int | None = 2,
         max_duration: float | timedelta | None = None,
@@ -108,7 +108,7 @@ class RetryPolicy:
         if max_duration is not None and seconds(max_duration) < 0:
             raise ValueError("max_duration must not be negative")
         self._handle = FailureConditions(handle)
-        self._abort = FailureConditions(abort) if abort is not None else None
+        self._abort = FailureConditions(abort) if abort is not UNSET else None
         self._delay = delay
         self._rng = rng if rng is not None else random.Random()
         self.max_retries = max_retries

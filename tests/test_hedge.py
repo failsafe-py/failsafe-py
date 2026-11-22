@@ -17,7 +17,6 @@ from failsafe import (
     ExecutionEvent,
     Failsafe,
     HedgePolicy,
-    Result,
     RetryPolicy,
     current_execution,
 )
@@ -191,7 +190,7 @@ def test_backup_executions_start_immediately() -> None:
         await asyncio.sleep(0)
         return index
 
-    policy = HedgePolicy(0.0, max_hedges=2, cancel_on=Result(2))
+    policy = HedgePolicy(0.0, max_hedges=2, cancel_on=2)
     assert run(policy, numbered) == 2
     assert len(started) == 3
 
@@ -206,7 +205,7 @@ def test_cancel_on_waits_for_a_matching_result() -> None:
         await asyncio.sleep(0)
         return index
 
-    policy = HedgePolicy(0.0, max_hedges=4, cancel_on=Result(3))
+    policy = HedgePolicy(0.0, max_hedges=4, cancel_on=3)
     assert run(policy, numbered) == 3
     assert len(started) == 4, "attempts stop as soon as one matches, before the cap"
 
@@ -223,7 +222,7 @@ def test_the_last_result_is_returned_when_none_is_acceptable() -> None:
         started.append(1)
         return 99
 
-    policy = HedgePolicy(0.0, max_hedges=2, cancel_on=Result(1))
+    policy = HedgePolicy(0.0, max_hedges=2, cancel_on=1)
     assert run(policy, unmatched) == 99
     assert len(started) == 3
 

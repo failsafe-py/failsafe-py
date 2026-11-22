@@ -88,7 +88,7 @@ def retry_after_delay(ex: Execution | None) -> float:
     :class:`~failsafe.RetryPolicy` or a :class:`~failsafe.CircuitBreaker`, mirroring
     Go's ``DelayFunc``::
 
-        CircuitBreaker(handle=Result(429), delay=retry_after_delay)
+        CircuitBreaker(handle=429, delay=retry_after_delay)
 
     Both header forms are honoured: delay-seconds, and an HTTP-date, which is
     converted to a delay from now. Only ``429`` and ``503`` responses are consulted,

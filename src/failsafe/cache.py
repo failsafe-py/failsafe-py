@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Generator
 from typing import Any, Protocol
 
-from ._conditions import Condition, FailureConditions
+from ._conditions import UNSET, Condition, FailureConditions
 from ._core import Execution, Instruction, Outcome, Step
 from ._events import ExecutionCompletedEvent, ExecutionEvent, Listener, Listeners
 
@@ -70,14 +70,14 @@ class CachePolicy:
         cache: Cache,
         *,
         key: Callable[..., str | None],
-        cache_if: Condition | None = None,
+        cache_if: Condition = UNSET,
         on_hit: Listener | None = None,
         on_miss: Listener | None = None,
         on_cached: Listener | None = None,
     ) -> None:
         self._cache = cache
         self._key = key
-        self._cache_if = FailureConditions(cache_if) if cache_if is not None else None
+        self._cache_if = FailureConditions(cache_if) if cache_if is not UNSET else None
         self.on_hit = Listeners("on_hit", on_hit)
         """Listeners called on a cache hit."""
         self.on_miss = Listeners("on_miss", on_miss)

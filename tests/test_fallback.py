@@ -9,7 +9,6 @@ from failsafe import (
     Execution,
     Failsafe,
     Fallback,
-    Result,
     RetriesExceeded,
     RetryPolicy,
     current_execution,
@@ -61,7 +60,7 @@ def test_handle_narrows_what_the_fallback_catches(clock: FakeClock) -> None:
 
 
 def test_handle_result_fires_on_a_value(clock: FakeClock) -> None:
-    policy = Fallback(value="cached", handle=Result(None))
+    policy = Fallback(value="cached", handle=None)
     assert Failsafe(policy, clock=clock).call(lambda: None) == "cached"
 
 

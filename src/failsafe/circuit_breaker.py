@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 
-from ._conditions import Condition, FailureConditions
+from ._conditions import UNSET, Condition, FailureConditions
 from ._core import SYSTEM_CLOCK, Clock, Execution, Instruction, Outcome, Step
 from ._delays import Delay, compile_delay, seconds
 from ._events import ExecutionEvent, Listener, Listeners, StateChangedEvent
@@ -159,7 +159,7 @@ class CircuitBreaker:
         failure_threshold: int | Ratio | Rate = 1,
         success_threshold: int | Ratio | None = None,
         delay: Delay | None = 60.0,
-        handle: Condition | None = None,
+        handle: Condition = UNSET,
         clock: Clock = SYSTEM_CLOCK,
         on_open: Listener | None = None,
         on_half_open: Listener | None = None,

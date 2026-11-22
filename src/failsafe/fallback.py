@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Generator
 from typing import Any
 
-from ._conditions import Condition, FailureConditions
+from ._conditions import UNSET, Condition, FailureConditions
 from ._core import Execution, Instruction, Outcome, Step
 from ._events import ExecutionCompletedEvent, Listener, Listeners
 
@@ -48,7 +48,7 @@ class Fallback:
         *,
         value: Any = _UNSET,
         fn: Callable[[Execution], Any] | None = None,
-        handle: Condition | None = None,
+        handle: Condition = UNSET,
         on_fallback: Listener | None = None,
         on_success: Listener | None = None,
         on_failure: Listener | None = None,
