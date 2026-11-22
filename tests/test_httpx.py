@@ -141,7 +141,7 @@ def test_does_not_retry_an_unsupported_scheme() -> None:
         (200, False),
         (400, False),
         (404, False),
-        (408, True),
+        (408, False),
         (429, True),
         (500, True),
         (501, False),
