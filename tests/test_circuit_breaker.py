@@ -483,7 +483,7 @@ def test_callable_delay_sees_the_failing_execution(clock: FakeClock) -> None:
 
 
 def test_manual_open_has_no_execution_for_a_callable_delay(clock: FakeClock) -> None:
-    """PORT.md item 12: a callable delay has no fixed delay to fall back on.
+    """A callable delay has no fixed delay to fall back on.
 
     Go keeps DelayFunc and Delay in separate fields, so a manual Open() falls through
     to the fixed one. Our single delay= union cannot express that pair, so a

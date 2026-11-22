@@ -385,7 +385,7 @@ def test_abort_on_a_result_value(clock: FakeClock) -> None:
 
 
 def test_cancelled_error_is_never_retried() -> None:
-    """PORT.md item 7: CancelledError is terminal, not a failure."""
+    """CancelledError is terminal, not a failure."""
     calls = 0
 
     async def fn() -> str:
@@ -485,7 +485,7 @@ def test_exceeded_wins_over_abort_on_the_last_attempt(clock: FakeClock) -> None:
 
 
 def test_listener_exception_does_not_break_the_execution(clock: FakeClock) -> None:
-    """PORT.md item 5: a metrics bug must not break a request."""
+    """A metrics bug must not break a request."""
 
     def boom(event: object) -> None:
         raise RuntimeError("metrics is down")
