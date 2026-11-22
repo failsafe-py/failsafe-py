@@ -28,10 +28,12 @@ class HedgePolicy:
     a second attempt while the first is still running and takes whichever finishes.
 
     Unlike [`RetryPolicy`][failsafe.RetryPolicy], attempts overlap. The losers are cancelled
-    for real once a winner is accepted::
+    for real once a winner is accepted:
 
-        api = AsyncFailsafe(HedgePolicy(0.1))          # hedge after 100ms
-        api = AsyncFailsafe(HedgePolicy(0.1, max_hedges=2))
+    ```python
+    api = AsyncFailsafe(HedgePolicy(0.1))          # hedge after 100ms
+    api = AsyncFailsafe(HedgePolicy(0.1, max_hedges=2))
+    ```
 
     **Async only.** Under [`Failsafe`][failsafe.Failsafe] this raises
     `NotImplementedError`: a synchronous call cannot be cancelled, so the losing

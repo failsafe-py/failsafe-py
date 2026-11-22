@@ -36,11 +36,13 @@ class CachePolicy:
     """Serves results from a cache, skipping the execution entirely on a hit.
 
     The key is a function of the call arguments, shaped like
-    `functools.lru_cache`::
+    `functools.lru_cache`:
 
-        cache = CachePolicy(backend, key=lambda user_id: f"user:{user_id}")
-        users = Failsafe(cache)
-        users.call(fetch_user, 42)
+    ```python
+    cache = CachePolicy(backend, key=lambda user_id: f"user:{user_id}")
+    users = Failsafe(cache)
+    users.call(fetch_user, 42)
+    ```
 
     Composed outermost, a hit skips every policy inside it, which is usually what you
     want: a cached result needs no retry, no circuit breaker and no rate limiter.

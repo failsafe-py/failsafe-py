@@ -1,14 +1,18 @@
 """Failsafe transports for httpx, the analogue of failsafe-go's ``failsafehttp``.
 
-Install with the ``httpx`` extra::
+Install with the ``httpx`` extra:
 
-    pip install 'failsafe-py[httpx]'
+```python
+pip install 'failsafe-py[httpx]'
+```
 
 A transport wraps another transport, so policies see each HTTP round trip as one
-execution::
+execution:
 
-    transport = FailsafeTransport(retry_policy(), circuit_breaker)
-    client = httpx.Client(transport=transport)
+```python
+transport = FailsafeTransport(retry_policy(), circuit_breaker)
+client = httpx.Client(transport=transport)
+```
 
 Only the client side is ported. Go's server-side handlers have no analogue here: an
 ASGI middleware is a different shape, and nothing in the core needs one.
@@ -87,9 +91,11 @@ def retry_after_delay(ex: Execution | None) -> float:
     Usable anywhere a callable delay is accepted, in a
     [`RetryPolicy`][failsafe.RetryPolicy] or a [`CircuitBreaker`][failsafe.CircuitBreaker],
         mirroring
-    Go's ``DelayFunc``::
+    Go's ``DelayFunc``:
 
-        CircuitBreaker(handle=429, delay=retry_after_delay)
+    ```python
+    CircuitBreaker(handle=429, delay=retry_after_delay)
+    ```
 
     Both header forms are honoured: delay-seconds, and an HTTP-date, which is
     converted to a delay from now. Only ``429`` and ``503`` responses are consulted,
@@ -130,9 +136,11 @@ def retry_policy(**kwargs: Any) -> RetryPolicy:
 
     Defaults to `is_retryable` for ``handle`` and `retry_after_delay` for
     ``delay``; both are overridable, as are all other
-    [`RetryPolicy`][failsafe.RetryPolicy] arguments::
+    [`RetryPolicy`][failsafe.RetryPolicy] arguments:
 
-        retry_policy(max_retries=3, delay=Backoff(1.0, 30.0))
+    ```python
+    retry_policy(max_retries=3, delay=Backoff(1.0, 30.0))
+    ```
 
     ``return_last_failure`` defaults to ``True``, so exhausting the retries on a
     failing *response* yields that response rather than
@@ -166,10 +174,12 @@ class FailsafeTransport(httpx.BaseTransport):
     """An `httpx.BaseTransport` that applies policies to each round trip.
 
     Policies are composed outermost-first, exactly as in
-    [`Failsafe`][failsafe.Failsafe]::
+    [`Failsafe`][failsafe.Failsafe]:
 
-        transport = FailsafeTransport(retry_policy(), breaker)
-        client = httpx.Client(transport=transport)
+    ```python
+    transport = FailsafeTransport(retry_policy(), breaker)
+    client = httpx.Client(transport=transport)
+    ```
 
     A streaming request body is buffered once so a retry can resend it; a request
     whose body httpx already holds in memory is left alone.

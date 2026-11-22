@@ -8,10 +8,12 @@ rather than the whole class at once.
 
 Priority is ambient rather than a parameter: it is request-scoped data
 that propagates across hops, so it lives in a `ContextVar` and is
-read by whichever policy happens to run::
+read by whichever policy happens to run:
 
-    with priority_scope(Priority.HIGH):
-        failsafe.run(charge_card)
+```python
+with priority_scope(Priority.HIGH):
+    failsafe.run(charge_card)
+```
 """
 
 from __future__ import annotations
