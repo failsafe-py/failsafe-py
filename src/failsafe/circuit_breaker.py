@@ -124,13 +124,13 @@ class CircuitBreaker:
         delay: How long to stay open before admitting trials. Accepts the same forms as
             a retry delay, including a callable over the execution.
         handle: What counts as a failure. Defaults to any exception.
-        clock: Custom time source, shared with the time-based window (e.g. for testing).
         on_open: Called when the breaker opens.
         on_half_open: Called when the breaker becomes half-open.
         on_close: Called when the breaker closes.
         on_state_change: Called after any of the above, with the same event.
         on_success: Called when an execution is recorded as a success.
         on_failure: Called when an execution is recorded as a failure.
+        clock: Custom time source, shared with the time-based window (e.g. for testing).
         rng: Custom source of delay jitter (e.g. for testing).
     """
 
@@ -167,13 +167,13 @@ class CircuitBreaker:
         success_threshold: int | Ratio | None = None,
         delay: Delay | None = 60.0,
         handle: Condition = UNSET,
-        clock: Clock = SYSTEM_CLOCK,
         on_open: Listener | None = None,
         on_half_open: Listener | None = None,
         on_close: Listener | None = None,
         on_state_change: Listener | None = None,
         on_success: Listener | None = None,
         on_failure: Listener | None = None,
+        clock: Clock = SYSTEM_CLOCK,
         rng: random.Random | None = None,
     ) -> None:
         self._lock = threading.Lock()
