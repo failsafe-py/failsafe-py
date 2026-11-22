@@ -29,24 +29,27 @@ class Timeout:
     [`RetryPolicy`][failsafe.RetryPolicy] can retry it. An `asyncio.CancelledError`
     cannot: that is terminal.
 
+    **Async interrupts the attempt; sync cannot.** Under `AsyncFailsafe` the awaiting
+    attempt is interrupted by `asyncio.timeout`. Under
+    [`Failsafe`][failsafe.Failsafe] the limit is checked between instructions, so a
+    blocking call runs to completion and the timeout is only observed once it returns.
+    A sync callee makes the limit real by passing
+    [`Execution.remaining()`][failsafe.Execution.remaining] to whatever blocks.
+
     Args:
         timeout: The limit, in seconds or as a timedelta.
-        interrupt: Run sync attempts on a worker thread so the caller is freed on time,
-            at the cost of leaving that thread running to completion. Ignored in async
-            mode, which always interrupts.
         on_timeout: Called when the limit is exceeded.
 
     Raises:
         ValueError: If ``timeout`` is not positive.
     """
 
-    __slots__ = ("interrupt", "on_timeout", "timeout")
+    __slots__ = ("on_timeout", "timeout")
 
     def __init__(
         self,
         timeout: float | timedelta,
         *,
-        interrupt: bool = False,
         on_timeout: Listener | None = None,
     ) -> None:
         limit = seconds(timeout)
@@ -54,8 +57,6 @@ class Timeout:
             raise ValueError("timeout must be positive")
         self.timeout = limit
         """The configured limit in seconds."""
-        self.interrupt = interrupt
-        """Whether sync attempts run on a worker thread."""
         self.on_timeout = Listeners("on_timeout", on_timeout)
         """Listeners called when the limit is exceeded."""
 
@@ -63,7 +64,7 @@ class Timeout:
         """Wrap ``inner`` in a race against the time limit."""
 
         def step(ex: Execution) -> Generator[Instruction, Any, Outcome[Any]]:
-            outcome = yield Race(inner, self.timeout, self.interrupt)
+            outcome = yield Race(inner, self.timeout)
             if outcome is not None:
                 return outcome  # type: ignore[no-any-return]
             exceeded = TimeoutExceeded(self.timeout)

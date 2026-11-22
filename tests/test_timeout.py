@@ -1,14 +1,14 @@
 """Timeout semantics, ported from failsafe-go's `timeout` package.
 
-Sync mode is cooperative unless ``interrupt=True``, so the sync tests assert the
-cooperative contract rather than Go's preemptive one; PORT.md records the
-deviation. Async mode matches Go, via :func:`asyncio.timeout`.
+Sync mode is cooperative, so the sync tests assert the cooperative contract rather
+than Go's preemptive one; PORT.md records the deviation. Async mode matches Go, via
+:func:`asyncio.timeout`.
 """
 
 from __future__ import annotations
 
 import asyncio
-import threading
+import time
 
 import pytest
 from conftest import flaky
@@ -129,31 +129,44 @@ def test_deadline_is_restored_after_the_race(clock: FakeClock) -> None:
     assert current_execution() is None
 
 
-def test_interrupting_timeout_frees_the_caller() -> None:
-    """interrupt=True releases the caller on time; the thread runs on."""
-    may_finish = threading.Event()
-    finished = threading.Event()
+def test_a_blocking_sync_call_runs_to_completion() -> None:
+    """The sync limitation, pinned: a call that cannot be interrupted is not.
+
+    The caller waits the full duration and only then sees the timeout, so the limit
+    bounds what is reported rather than what is spent. A callee that reads
+    ``remaining()`` is what makes it real.
+    """
+    started = time.monotonic()
 
     def slow() -> str:
-        may_finish.wait(5.0)
-        finished.set()
+        time.sleep(0.2)
         return "late"
 
-    fs = Failsafe(Timeout(0.05, interrupt=True))
     with pytest.raises(TimeoutExceeded):
-        fs.call(slow)
+        Failsafe(Timeout(0.02)).call(slow)
 
-    # The caller is back while the worker is still parked, which is the whole claim:
-    # it was freed rather than waiting for the work to finish.
-    assert not finished.is_set(), "the abandoned work is still running"
-
-    may_finish.set()
-    assert finished.wait(5.0), "...and leaks to completion, the documented cost"
+    assert time.monotonic() - started >= 0.2, "the blocking call was not cut short"
 
 
-def test_interrupting_timeout_returns_a_fast_result() -> None:
-    fs = Failsafe(Timeout(5.0, interrupt=True))
-    assert fs.call(lambda: "ok") == "ok"
+def test_a_cooperating_callee_honours_the_deadline() -> None:
+    """``remaining()`` is the sync answer: the callee bounds its own work."""
+    observed: list[float] = []
+
+    def cooperating() -> str:
+        execution = current_execution()
+        assert execution is not None
+        budget = execution.remaining()
+        assert budget is not None
+        observed.append(budget)
+        time.sleep(min(budget, 1.0))
+        return "done"
+
+    started = time.monotonic()
+    with pytest.raises(TimeoutExceeded):
+        Failsafe(Timeout(0.05)).call(cooperating)
+
+    assert observed and observed[0] == pytest.approx(0.05, abs=0.02)
+    assert time.monotonic() - started < 0.5, "returned on the callee's own deadline"
 
 
 # ----------------------------------------------------------------------- async

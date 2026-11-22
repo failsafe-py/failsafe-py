@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import contextvars
 import functools
 from collections.abc import Callable, Generator
-from concurrent.futures import ThreadPoolExecutor, wait
 from typing import Any, ParamSpec, TypeVar
 
 from ._core import (
@@ -56,14 +54,13 @@ class Failsafe:
         clock: Custom time source for delays and deadlines (e.g. for testing).
     """
 
-    __slots__ = ("_chain", "_clock", "_pool", "policies")
+    __slots__ = ("_chain", "_clock", "policies")
 
     def __init__(self, *policies: Policy, clock: Clock = SYSTEM_CLOCK) -> None:
         self.policies = policies
         """The configured policies, outermost first."""
         self._clock = clock
         self._chain = compose(policies)
-        self._pool: ThreadPoolExecutor | None = None
 
     def call(self, fn: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
         """Execute ``fn`` under the configured policies and return its result.
@@ -191,8 +188,6 @@ class Failsafe:
             deadline = min(deadline, outer_deadline)
         previous_deadline, ex.deadline = ex.deadline, deadline
         try:
-            if race.interrupt:
-                return self._race_interrupting(race, ex, fn, args, kwargs)
             outcome = self._pump(race.inner(ex), ex, fn, args, kwargs, deadline)
             if self._clock.now() >= deadline:
                 return None
@@ -200,31 +195,3 @@ class Failsafe:
         finally:
             ex.deadline = previous_deadline
 
-    def _race_interrupting(
-        self,
-        race: Race,
-        ex: Execution,
-        fn: Callable[..., R],
-        args: tuple[Any, ...],
-        kwargs: dict[str, Any],
-    ) -> Outcome[Any] | None:
-        """Run an inner step on a worker thread, freeing the caller when time is up.
-
-        The abandoned thread keeps running to completion: Python cannot kill a thread,
-        and killing one mid-call would corrupt whatever it holds. This is the documented
-        cost of ``interrupt=True``.
-        """
-        if self._pool is None:
-            # ponytail: one unbounded pool per Failsafe, created on first interrupting
-            # timeout. Bound it if a caller is measured to exhaust threads.
-            self._pool = ThreadPoolExecutor(thread_name_prefix="failsafe-timeout")
-        context = contextvars.copy_context()
-        gen = race.inner(ex)
-        future = self._pool.submit(context.run, self._pump, gen, ex, fn, args, kwargs)
-        # Wall time, not the clock seam: a worker thread is real concurrency, and a
-        # FakeClock cannot make another thread finish.
-        done, _ = wait([future], timeout=race.seconds)
-        if not done:
-            return None
-        outcome: Outcome[Any] = future.result()
-        return outcome
