@@ -2,6 +2,8 @@
 
 Sheds load when a dependency's failure rate climbs.
 
+[Guide: Adaptive throttler](https://failsafe-py.github.io/adaptive-throttler){ .md-button }
+
 ::: failsafe.AdaptiveThrottler
 
 ::: failsafe.throttle_prioritizer
