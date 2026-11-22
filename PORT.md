@@ -74,7 +74,7 @@ at your own risk.
 
 1. **A bare value is a result condition.** `handle="bad"` and `handle=None` match a
     returned value; Go needs its separate `HandleResult` builder. Values that would
-    read as something else — a tuple, a list, anything callable — need `Result(v)`, as
+    read as something else — a tuple, a list, anything callable — need a predicate, as
     does any member of a collection. Ambiguous and empty collections raise `TypeError`
     rather than being guessed at.
 

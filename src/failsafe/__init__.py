@@ -4,7 +4,7 @@ A port of failsafe-go.
 """
 
 from ._async import AsyncFailsafe
-from ._conditions import Condition, Result
+from ._conditions import Condition
 from ._core import Execution, current_execution
 from ._delays import Backoff, Delay, Fixed, Jitter, RandomDelay
 from ._events import (
@@ -84,7 +84,6 @@ __all__ = [
     "RateLimitExceeded",
     "RateLimiter",
     "Ratio",
-    "Result",
     "RetriesExceeded",
     "RetryPolicy",
     "ScheduledRetryEvent",

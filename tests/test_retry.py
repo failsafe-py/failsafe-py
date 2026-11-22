@@ -18,7 +18,6 @@ from failsafe import (
     Fixed,
     Jitter,
     RandomDelay,
-    Result,
     RetriesExceeded,
     RetryPolicy,
     current_execution,
@@ -275,9 +274,9 @@ def test_an_omitted_condition_still_means_any_exception(clock: FakeClock) -> Non
 
 def test_a_bare_value_inside_a_collection_is_rejected() -> None:
     """A collection already means "any of these", so a bare member is ambiguous."""
-    with pytest.raises(TypeError, match=r"Result\('bad'\)"):
+    with pytest.raises(TypeError, match=r"lambda result, exc: result == 'bad'"):
         RetryPolicy(handle=["bad", ConnectionError])
-    with pytest.raises(TypeError, match=r"Result\(1\)"):
+    with pytest.raises(TypeError, match=r"lambda result, exc: result == 1"):
         RetryPolicy(handle=[1, 2, 3])
 
 
@@ -291,11 +290,11 @@ def test_an_empty_collection_is_rejected() -> None:
 
 def test_a_tuple_follows_the_collection_rule(clock: FakeClock) -> None:
     """A tuple already means exception types, so a bare member is ambiguous there too."""
-    with pytest.raises(TypeError, match=r"Result\(1\)"):
+    with pytest.raises(TypeError, match=r"lambda result, exc: result == 1"):
         RetryPolicy(handle=(1, 2))
-    # Matching a returned tuple is still reachable, through the wrapper.
+    # Matching a returned tuple is still reachable, through a predicate.
     results = iter([(1, 2), "done"])
-    policy = RetryPolicy(handle=Result((1, 2)), max_retries=3)
+    policy = RetryPolicy(handle=lambda result, exc: result == (1, 2), max_retries=3)
     assert Failsafe(policy, clock=clock).call(lambda: next(results)) == "done"
 
 
@@ -329,7 +328,9 @@ def test_an_error_condition_does_replace_default_error_handling(clock: FakeClock
         calls += 1
         raise ValueError("unmatched")
 
-    policy = RetryPolicy(handle=[Result("bad"), ConnectionError], max_retries=5)
+    policy = RetryPolicy(
+        handle=[lambda result, exc: result == "bad", ConnectionError], max_retries=5
+    )
     with pytest.raises(ValueError):
         Failsafe(policy, clock=clock).call(fn)
     assert calls == 1
@@ -352,7 +353,7 @@ def test_handle_predicate_sees_result_and_exception(clock: FakeClock) -> None:
 def test_conditions_are_ored(clock: FakeClock) -> None:
     """Go: multiple handle conditions are logically OR'ed."""
     results = iter(["a", "b", "ok"])
-    policy = RetryPolicy(handle=[Result("a"), Result("b")], max_retries=5)
+    policy = RetryPolicy(handle=lambda result, exc: result in ("a", "b"), max_retries=5)
     assert Failsafe(policy, clock=clock).call(lambda: next(results)) == "ok"
 
 
