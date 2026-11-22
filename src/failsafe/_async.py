@@ -266,12 +266,14 @@ class AsyncFailsafe:
         deadline, which user code reads through ``Execution.remaining()``.
         """
         previous_deadline = ex.deadline
+        scope = asyncio.timeout(race.seconds)
         try:
-            # Relative seconds: asyncio.timeout_at is the absolute-deadline variant.
-            async with asyncio.timeout(race.seconds) as scope:
+            async with scope:
                 ex.deadline = self._deadline_from(scope.when())
                 return await self._pump(race.inner(ex), ex, fn, args, kwargs)
         except TimeoutError:
+            if not scope.expired():
+                raise
             return None
         finally:
             ex.deadline = previous_deadline
