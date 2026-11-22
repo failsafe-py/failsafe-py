@@ -85,7 +85,7 @@ def test_async_driver_awaits_the_function() -> None:
 
 
 def test_cancelled_error_is_not_retried() -> None:
-    """CancelledError is a BaseException: terminal, never a failure (PORT.md item 7)."""
+    """CancelledError is a BaseException: terminal, never a failure."""
     calls = 0
 
     async def cancelled() -> str:

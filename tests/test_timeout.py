@@ -1,7 +1,7 @@
 """Timeout semantics, ported from failsafe-go's `timeout` package.
 
 Sync mode is cooperative unless ``interrupt=True``, so the sync tests assert the
-cooperative contract rather than Go's preemptive one; PORT.md item 1 records the
+cooperative contract rather than Go's preemptive one; PORT.md records the
 deviation. Async mode matches Go, via :func:`asyncio.timeout`.
 """
 
