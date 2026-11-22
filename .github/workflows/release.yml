@@ -53,3 +53,5 @@ jobs:
           name: dist
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
+      # Afterwards: activate the new version on Read the Docs — tags arrive inactive.
+      # See RELEASING.md.

@@ -46,3 +46,6 @@ uv run mypy
 
 All four must pass. CI runs them on every
 [supported Python version](https://devguide.python.org/versions/).
+
+Breaking changes mark their commit with `!` — `feat!: …` — so they reach the release
+notes. See [RELEASING.md](RELEASING.md).

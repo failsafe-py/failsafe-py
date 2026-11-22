@@ -12,6 +12,7 @@ Conventional commits. Terse descriptions — a subject line, nothing more unless
 - `<description>`: imperative, lower case, no trailing period, ≤ 50 chars.
 - Types: `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `chore`, `build`, `ci`.
 - Scope is the module or artifact (`retry`, `core`, `httpx`), omitted when it adds nothing.
+- Breaking changes take a `!` after the type or scope: `feat!:`, `refactor(retry)!:`.
 - Body only for surprising decisions or a `BREAKING CHANGE:` footer. No restating the diff.
 
 Good:
