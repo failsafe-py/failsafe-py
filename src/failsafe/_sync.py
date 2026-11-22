@@ -62,8 +62,12 @@ class Failsafe:
         self._chain = compose(policies)
         self._pool: ThreadPoolExecutor | None = None
 
-    def call(self, fn: Callable[..., R], /, *args: Any, **kwargs: Any) -> R:
+    def call(self, fn: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
         """Execute ``fn`` under the configured policies and return its result.
+
+        The result type comes from ``fn``, and the arguments are checked against its
+        signature, so one composition can guard calls returning different types
+        without giving up either check.
 
         Args:
             fn: The function to execute. Called once per attempt.

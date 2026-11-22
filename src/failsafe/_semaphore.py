@@ -78,7 +78,7 @@ class FifoSemaphore:
     __slots__ = ("_lock", "_size", "_used", "_waiters")
 
     def __init__(self, size: int) -> None:
-        self._lock = threading.Lock()
+        self._lock = threading.Condition(threading.Lock())
         self._size = size
         self._used = 0
         self._waiters: collections.deque[_ThreadWaiter | _AsyncWaiter] = collections.deque()
@@ -94,6 +94,39 @@ class FifoSemaphore:
         """The number of callers blocked waiting for a permit."""
         with self._lock:
             return len(self._waiters)
+
+    def await_waiters(self, count: int, timeout: float = 5.0) -> bool:
+        """Block until at least ``count`` callers are parked, or ``timeout`` elapses.
+
+        A synchronisation seam for tests of arrival order, which must let one caller
+        park before releasing the next. Polling ``waiters`` in a sleep loop is the
+        alternative, and it trades real time for the same answer less reliably.
+
+        Args:
+            count: How many parked callers to wait for.
+            timeout: Seconds to wait before giving up.
+
+        Returns:
+            Whether the count was reached.
+        """
+        with self._lock:
+            return self._lock.wait_for(lambda: len(self._waiters) >= count, timeout)
+
+    def await_released(self, timeout: float = 5.0) -> bool:
+        """Block until every permit is free, or ``timeout`` elapses.
+
+        The companion to :meth:`await_waiters` for tests that must observe a permit
+        coming back from a thread they cannot join, such as an attempt abandoned by
+        an interrupting timeout.
+
+        Args:
+            timeout: Seconds to wait before giving up.
+
+        Returns:
+            Whether every permit was released.
+        """
+        with self._lock:
+            return self._lock.wait_for(lambda: self._used == 0, timeout)
 
     @property
     def size(self) -> int:
@@ -142,6 +175,7 @@ class FifoSemaphore:
                 return False
             waiter = _ThreadWaiter()
             self._waiters.append(waiter)
+            self._lock.notify_all()
         try:
             granted = waiter.wait(timeout)
         except BaseException:
@@ -167,6 +201,7 @@ class FifoSemaphore:
                 return False
             awaiter = _AsyncWaiter()
             self._waiters.append(awaiter)
+            self._lock.notify_all()
         try:
             granted = await awaiter.wait(timeout)
         except BaseException:  # notably CancelledError: never leave a waiter behind
@@ -189,6 +224,7 @@ class FifoSemaphore:
             if self._used < self._size and self._waiters:
                 self._used += 1
                 self._waiters.popleft().claim()
+            self._lock.notify_all()
 
     def _available(self) -> bool:
         return self._used < self._size and not self._waiters

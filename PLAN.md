@@ -485,13 +485,27 @@ leaked waiters on timeout — prototyped.
 
 ### D-15 — Typing
 
-- **`Failsafe` is not `Generic[R]`; `call` is.** The original plan said `Generic[R]`
-  defaulting to `Any`, but PEP 696 defaults need 3.13 and the floor is 3.11. On 3.11
-  `Failsafe(retry)` infers `Never`, so every example here would need `Failsafe[str](retry)`.
-  Inferring `R` per `call` keeps `fs.call(connect, host)` typed with no annotation.
-  Policies stay non-generic for the same reason; nothing in the engine needs `R`.
+- **`Failsafe` is not `Generic[R]`; `call` is.** Inferring `R` per call keeps
+  `fs.call(connect, host)` typed with no annotation, and lets one composition guard
+  calls returning different types.
+
+  An earlier draft justified this by the Python floor: that PEP 696 defaults need 3.13,
+  and that `Failsafe(retry)` would otherwise infer `Never`. Both are wrong.
+  `typing_extensions.TypeVar` backports PEP 696 to 3.11, and a class variable with a
+  default infers `Failsafe[Any]`, not `Never`; only an undefaulted one gives `Never`.
+
+  The real reason is that a composition-level `R` conflicts with reusing a composition.
+  Measured: with `Fallback` generic in its value, `Failsafe(Fallback(value=cached),
+  RetryPolicy())` binds `R` to the fallback's type, after which any call returning
+  something else is a type error — and `Fallback(value=None)` pins the whole
+  composition to `None`. That breaks the one-per-backend pattern this library
+  recommends, to catch a wrong-typed fallback that the first test run catches anyway.
+- **`call` takes a `ParamSpec`**, so arguments are checked against the wrapped
+  function's signature, not just its return type. `tests/test_typing.py` pins this:
+  the deliberate errors there carry `type: ignore` comments, and strict mode's
+  unused-ignore warning fails the build if a check stops working.
 - Go's `ResultAgnosticPolicy`, `ComposeAny`, `WithAny` and type tokens all vanish —
-  `CircuitBreaker[Any]` composes with `Failsafe[Response]` for free under mypy.
+  `CircuitBreaker` composes with any result type for free under mypy.
 - `py.typed`; strict mypy and pyright clean. Bad typing is the top complaint about Python
   resilience libraries.
 - `ParamSpec` on the decorator so signatures survive.
@@ -806,15 +820,22 @@ Go uses `testing/synctest` for a virtual clock; the equivalent here is an inject
 
 - **One time seam** in `_core` (`clock()` plus the drivers' sleep). Tests install a `FakeClock`
   that advances instantly: no `time.sleep` on the clock seam or in assertion paths, no flaky CI.
-  This seam is required by the design, not bolted on for tests. Thread-coordination tests may
-  poll observable state at a short interval with a deadline, which is a positive observation of
-  a handoff rather than a guess at a duration.
+  This seam is required by the design, not bolted on for tests.
 - **Port failsafe-go's test corpus where it encodes semantics** — `circuitbreaker` (4 files),
   `ratelimiter` (4), `retrypolicy` (2), `test/issues/`. Those tests are the specification; for
   anything ambiguous, cross-check against Go behaviour rather than inventing.
 - Concurrency tests (semaphore fairness, hedge cancellation) need real threads and a real loop.
   Keep them few, bounded and deterministic, driven by explicit handoff events rather than sleeping
   and hoping — a "still blocked at t=0.1 s" check is a negative observation and weak evidence.
+- **No test reads a wall clock, and none sleeps to wait for another thread.** A sleep in a test
+  is a missing seam: either the production code cannot say when it reached a state, or the test
+  is guessing at a duration. Both are bugs, and the second is flaky by construction — a
+  `>= 0.02` elapsed-time assertion failed CI on a 25 µs margin. The seams that replaced them:
+  `FifoSemaphore.await_waiters`/`await_released` (and the `Bulkhead` and `AdaptiveLimiter`
+  forwards) block until a caller has parked or a permit has come back, and
+  `Prioritizer.on_calibrated` fires on every calibration rather than only on a threshold move.
+  Work that must be slow is a `threading.Event` the test releases, not a duration. Removing the
+  sleeps halved the suite, from 1.4 s to 0.7 s.
 - **The clock seam has two documented holes, both structural.** `asyncio.timeout` runs on the
   event loop's own clock, which no injected clock can drive, so async deadline tests use real
   sub-100 ms waits and `_async._race` translates loop time onto the configured clock for

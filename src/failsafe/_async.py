@@ -56,8 +56,12 @@ class AsyncFailsafe:
         self._clock = clock
         self._chain = compose(policies)
 
-    async def call(self, fn: Callable[..., Awaitable[R]], /, *args: Any, **kwargs: Any) -> R:
+    async def call(self, fn: Callable[P, Awaitable[R]], /, *args: P.args, **kwargs: P.kwargs) -> R:
         """Execute ``fn`` under the configured policies and return its result.
+
+        The result type comes from ``fn``, and the arguments are checked against its
+        signature, so one composition can guard calls returning different types
+        without giving up either check.
 
         Args:
             fn: The coroutine function to execute. Awaited once per attempt.

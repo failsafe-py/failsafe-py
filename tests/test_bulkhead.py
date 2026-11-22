@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import threading
-import time
 
 import pytest
 
@@ -37,18 +36,21 @@ def test_acquire_permit_waits_for_a_release() -> None:
     bulkhead.try_acquire_permit()
     bulkhead.try_acquire_permit()
 
-    def release_later() -> None:
-        time.sleep(0.05)
-        bulkhead.release_permit()
+    acquired = threading.Event()
 
-    releaser = threading.Thread(target=release_later)
-    releaser.start()
-    started = time.monotonic()
-    bulkhead.acquire_permit()
-    elapsed = time.monotonic() - started
-    releaser.join()
+    def acquire_in_background() -> None:
+        bulkhead.acquire_permit()
+        acquired.set()
 
-    assert elapsed >= 0.05
+    waiter = threading.Thread(target=acquire_in_background)
+    waiter.start()
+
+    assert bulkhead.await_waiters(1), "the third acquire never queued"
+    assert not acquired.is_set(), "it is blocked, not merely slow"
+
+    bulkhead.release_permit()
+    assert acquired.wait(5.0), "the released permit went to the waiter"
+    waiter.join(5.0)
     assert bulkhead.used == 2
 
 
@@ -129,9 +131,12 @@ def test_permit_is_released_when_an_interrupted_attempt_finishes() -> None:
     from failsafe import Timeout, TimeoutExceeded
 
     bulkhead = Bulkhead(1)
+    may_finish = threading.Event()
+    finished = threading.Event()
 
     def slow() -> str:
-        time.sleep(0.2)
+        may_finish.wait(5.0)
+        finished.set()
         return "late"
 
     with pytest.raises(TimeoutExceeded):
@@ -139,10 +144,9 @@ def test_permit_is_released_when_an_interrupted_attempt_finishes() -> None:
 
     assert bulkhead.used == 1, "the worker still holds it; the thread cannot be killed"
 
-    deadline = time.monotonic() + 2.0
-    while bulkhead.used and time.monotonic() < deadline:
-        time.sleep(0.01)
-    assert bulkhead.used == 0, "released once the abandoned attempt returned"
+    may_finish.set()
+    assert finished.wait(5.0), "the abandoned attempt ran to completion"
+    assert bulkhead.await_released(5.0), "released once the abandoned attempt returned"
 
 
 def test_concurrent_executions_are_capped() -> None:
@@ -153,20 +157,27 @@ def test_concurrent_executions_are_capped() -> None:
     running = 0
     peak = 0
 
+    saturated = threading.Event()
+    may_finish = threading.Event()
+
     def work() -> None:
         nonlocal running, peak
         with lock:
             running += 1
             peak = max(peak, running)
-        time.sleep(0.01)
+            if running == 3:
+                saturated.set()
+        may_finish.wait(5.0)
         with lock:
             running -= 1
 
     threads = [threading.Thread(target=lambda: fs.call(work)) for _ in range(12)]
     for thread in threads:
         thread.start()
+    assert saturated.wait(5.0), "three executions ran at once"
+    may_finish.set()
     for thread in threads:
-        thread.join()
+        thread.join(5.0)
 
     assert peak == 3, "saturated, but never exceeded"
     assert bulkhead.used == 0
@@ -219,10 +230,7 @@ def test_waiters_are_served_in_arrival_order() -> None:
     for index in range(3):
         thread = threading.Thread(target=contend, args=(index,))
         thread.start()
-        deadline = time.monotonic() + 2.0
-        while bulkhead.waiters <= index and time.monotonic() < deadline:
-            time.sleep(0.001)
-        assert bulkhead.waiters == index + 1, "each thread queued before the next starts"
+        assert bulkhead.await_waiters(index + 1), "each thread queued before the next"
         threads.append(thread)
 
     bulkhead.release_permit()

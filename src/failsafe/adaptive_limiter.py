@@ -96,6 +96,7 @@ def queue_prioritizer(
     level_tracker: Any = None,
     usage_tracker: Any = None,
     on_threshold_changed: Listener | None = None,
+    on_calibrated: Listener | None = None,
 ) -> Prioritizer:
     """Create a :class:`~failsafe._prioritizer.Prioritizer` driven by limiter queueing.
 
@@ -103,6 +104,7 @@ def queue_prioritizer(
         level_tracker: Where accepted levels are recorded. Shared if given.
         usage_tracker: Ranks users by usage so heavy users shed first. Optional.
         on_threshold_changed: Called when the rejection threshold moves.
+        on_calibrated: Called after every calibration, whether or not it moved.
 
     Returns:
         A prioritizer for :class:`AdaptiveLimiter` instances.
@@ -112,6 +114,7 @@ def queue_prioritizer(
         level_tracker=level_tracker,
         usage_tracker=usage_tracker,
         on_threshold_changed=on_threshold_changed,
+        on_calibrated=on_calibrated,
     )
 
 
@@ -341,6 +344,18 @@ class AdaptiveLimiter:
     def queued(self) -> int:
         """How many executions are waiting for a permit."""
         return self._semaphore.waiters
+
+    def await_queued(self, count: int, timeout: float = 5.0) -> bool:
+        """Block until at least ``count`` executions are queued, or ``timeout`` elapses.
+
+        Args:
+            count: How many queued executions to wait for.
+            timeout: Seconds to wait before giving up.
+
+        Returns:
+            Whether the count was reached.
+        """
+        return self._semaphore.await_waiters(count, timeout)
 
     @property
     def max_inflight(self) -> int:

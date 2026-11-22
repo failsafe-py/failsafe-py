@@ -5,7 +5,6 @@ from __future__ import annotations
 import contextlib
 import random
 import threading
-import time
 
 import pytest
 
@@ -249,7 +248,8 @@ def test_usage_ranking_decides_between_users_at_one_priority() -> None:
 
 
 def test_scheduled_calibrations_run_until_the_block_exits() -> None:
-    prioritizer = queue_prioritizer()
+    calibrated = threading.Event()
+    prioritizer = queue_prioritizer(on_calibrated=lambda _event: calibrated.set())
     limiter = AdaptiveLimiter(
         min_limit=1, max_limit=1, initial_limit=1, queueing=(1.0, 2.0)
     ).prioritized_by(prioritizer)
@@ -260,10 +260,7 @@ def test_scheduled_calibrations_run_until_the_block_exits() -> None:
     queuer.wait_for_queued(limiter, 2)
 
     with prioritizer.scheduled_calibrations(0.01):
-        deadline = time.monotonic() + 2.0
-        while prioritizer.rejection_rate == 0.0:
-            assert time.monotonic() < deadline, "no calibration ran"
-            time.sleep(0.005)
+        assert calibrated.wait(5.0), "no calibration ran"
 
     assert prioritizer.rejection_rate > 0.0
     assert 100 <= prioritizer.rejection_threshold <= 199
@@ -336,10 +333,7 @@ class _Queuer:
         self._threads.append(thread)
 
     def wait_for_queued(self, limiter: AdaptiveLimiter, count: int) -> None:
-        deadline = time.monotonic() + 2.0
-        while limiter.queued < count:
-            assert time.monotonic() < deadline, f"only {limiter.queued} of {count} queued"
-            time.sleep(0.001)
+        assert limiter.await_queued(count), f"only {limiter.queued} of {count} queued"
 
     def release(self, *held: _Permit) -> None:
         """Release the queue, then any permits the test itself is holding.

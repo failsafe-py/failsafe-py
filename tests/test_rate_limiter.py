@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import asyncio
 import threading
-import time
 
 import pytest
 
@@ -317,34 +316,34 @@ def test_max_wait_time_does_not_apply_to_standalone_acquire(clock: FakeClock) ->
     assert clock.slept == [1.0], "standalone waited rather than raising"
 
 
-def test_async_executor_waits_for_a_permit() -> None:
+def test_async_executor_waits_for_a_permit(clock: FakeClock) -> None:
     """The async driver services the same Sleep instruction."""
-    limiter = RateLimiter.smooth(max_rate=0.02, max_wait_time=1.0)
-    fs = AsyncFailsafe(limiter)
+    limiter = RateLimiter.smooth(max_rate=0.02, max_wait_time=1.0, clock=clock)
+    fs = AsyncFailsafe(limiter, clock=clock)
 
     async def scenario() -> list[str]:
         async def call(tag: str) -> str:
             return tag
 
-        started = time.monotonic()
-        results = [await fs.call(call, "a"), await fs.call(call, "b")]
-        assert time.monotonic() - started >= 0.02
-        return results
+        return [await fs.call(call, "a"), await fs.call(call, "b")]
 
     assert asyncio.run(scenario()) == ["a", "b"]
+    # Asserting the slept duration rather than wall-clock elapsed: asyncio.sleep may
+    # return a few microseconds early, which made a real-time comparison flaky.
+    assert clock.slept == [pytest.approx(0.02)], "the second call waited for its permit"
 
 
-def test_async_standalone_acquire_waits() -> None:
+def test_async_standalone_acquire_waits(clock: FakeClock) -> None:
     """acquire_permit_async suspends rather than blocking the loop."""
-    limiter = RateLimiter.smooth(max_rate=0.02)
+    limiter = RateLimiter.smooth(max_rate=0.02, clock=clock)
 
     async def scenario() -> None:
         await limiter.acquire_permit_async()
-        started = time.monotonic()
         await limiter.acquire_permit_async()
-        assert time.monotonic() - started >= 0.02
 
     asyncio.run(scenario())
+
+    assert clock.slept == [pytest.approx(0.02)], "the second acquire waited its turn"
 
 
 def test_retry_outside_a_limiter_reacquires_per_attempt(clock: FakeClock) -> None:

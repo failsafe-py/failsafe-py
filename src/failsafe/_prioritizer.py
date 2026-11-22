@@ -26,7 +26,13 @@ from .priority import (
     current_user,
 )
 
-__all__ = ["Prioritizer", "RejectionStrategy", "Stats", "ThresholdChangedEvent"]
+__all__ = [
+    "CalibratedEvent",
+    "Prioritizer",
+    "RejectionStrategy",
+    "Stats",
+    "ThresholdChangedEvent",
+]
 
 _logger = logging.getLogger("failsafe.prioritizer")
 
@@ -42,6 +48,23 @@ class ThresholdChangedEvent:
 
     old_threshold: int
     new_threshold: int
+
+
+@dataclass(frozen=True, slots=True)
+class CalibratedEvent:
+    """A :class:`Prioritizer` finished a calibration.
+
+    Fires on every calibration, including those that left the threshold alone, so a
+    caller can confirm the schedule is running rather than only that it changed
+    something.
+
+    Attributes:
+        rejection_rate: The share of executions to reject, from 0 to 1.
+        threshold: The level below which executions are now rejected.
+    """
+
+    rejection_rate: float
+    threshold: int
 
 
 class Stats(Protocol):
@@ -81,6 +104,8 @@ class Prioritizer:
             pool their level distributions.
         usage_tracker: Ranks users by usage so heavy users are shed first. Optional.
         on_threshold_changed: Called when the rejection threshold moves.
+        on_calibrated: Called after every calibration, whether or not the threshold
+            moved. Fires on the scheduling thread when calibrations are scheduled.
     """
 
     __slots__ = (
@@ -91,6 +116,7 @@ class Prioritizer:
         "_strategy",
         "_threshold",
         "_usage_tracker",
+        "on_calibrated",
         "on_threshold_changed",
     )
 
@@ -101,6 +127,7 @@ class Prioritizer:
         level_tracker: LevelTracker | None = None,
         usage_tracker: UsageTracker | None = None,
         on_threshold_changed: Listener | None = None,
+        on_calibrated: Listener | None = None,
     ) -> None:
         self._strategy = strategy
         self._level_tracker = level_tracker if level_tracker is not None else LevelTracker()
@@ -110,6 +137,7 @@ class Prioritizer:
         self._rejection_rate = 0.0
         self._threshold = 0
         self.on_threshold_changed = Listeners("on_threshold_changed", on_threshold_changed)
+        self.on_calibrated = Listeners("on_calibrated", on_calibrated)
 
     @property
     def level_tracker(self) -> LevelTracker:
@@ -167,6 +195,8 @@ class Prioritizer:
             self.on_threshold_changed.emit(ThresholdChangedEvent(old_threshold, new_threshold))
         if self._usage_tracker is not None:
             self._usage_tracker.calibrate()
+        if self.on_calibrated:
+            self.on_calibrated.emit(CalibratedEvent(rate, new_threshold))
 
     @contextlib.contextmanager
     def scheduled_calibrations(self, interval: float) -> Iterator[None]:

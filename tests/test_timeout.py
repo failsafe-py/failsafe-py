@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 import threading
-import time
 
 import pytest
 from conftest import flaky
@@ -132,22 +131,24 @@ def test_deadline_is_restored_after_the_race(clock: FakeClock) -> None:
 
 def test_interrupting_timeout_frees_the_caller() -> None:
     """interrupt=True releases the caller on time; the thread runs on."""
+    may_finish = threading.Event()
     finished = threading.Event()
 
     def slow() -> str:
-        time.sleep(0.4)
+        may_finish.wait(5.0)
         finished.set()
         return "late"
 
     fs = Failsafe(Timeout(0.05, interrupt=True))
-    started = time.monotonic()
     with pytest.raises(TimeoutExceeded):
         fs.call(slow)
-    caller_elapsed = time.monotonic() - started
 
-    assert caller_elapsed < 0.3, "the caller must be freed on time"
+    # The caller is back while the worker is still parked, which is the whole claim:
+    # it was freed rather than waiting for the work to finish.
     assert not finished.is_set(), "the abandoned work is still running"
-    assert finished.wait(2.0), "...and leaks to completion, the documented cost"
+
+    may_finish.set()
+    assert finished.wait(5.0), "...and leaks to completion, the documented cost"
 
 
 def test_interrupting_timeout_returns_a_fast_result() -> None:

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 import threading
-import time
 
 import pytest
 
@@ -71,10 +70,7 @@ def test_waiters_are_served_in_arrival_order() -> None:
         thread.start()
         # Arrival order is enqueue order, so wait for this worker to be queued before
         # starting the next one.
-        deadline = time.monotonic() + 5.0
-        while sem.waiters <= i:
-            assert time.monotonic() < deadline, "worker never queued"
-            time.sleep(0.001)
+        assert sem.await_waiters(i + 1), "worker never queued"
         threads.append(thread)
 
     sem.release()
@@ -177,19 +173,13 @@ def test_growing_hands_new_permits_to_waiters() -> None:
     sem = FifoSemaphore(1)
     assert sem.acquire(timeout=0)
     granted: list[bool] = []
-    waiting = threading.Event()
 
     def wait_for_permit() -> None:
-        waiting.set()
         granted.append(sem.acquire(5.0))
 
     thread = threading.Thread(target=wait_for_permit, daemon=True)
     thread.start()
-    waiting.wait(1.0)
-    deadline = time.monotonic() + 2.0
-    while sem.waiters == 0:
-        assert time.monotonic() < deadline, "waiter never queued"
-        time.sleep(0.001)
+    assert sem.await_waiters(1), "waiter never queued"
 
     sem.resize(2)
     thread.join(5.0)
@@ -221,19 +211,13 @@ def test_releasing_after_a_shrink_drains_to_the_new_size() -> None:
     for _ in range(3):
         assert sem.acquire(timeout=0)
     granted: list[bool] = []
-    waiting = threading.Event()
 
     def wait_for_permit() -> None:
-        waiting.set()
         granted.append(sem.acquire(5.0))
 
     thread = threading.Thread(target=wait_for_permit, daemon=True)
     thread.start()
-    waiting.wait(1.0)
-    deadline = time.monotonic() + 2.0
-    while sem.waiters == 0:
-        assert time.monotonic() < deadline, "waiter never queued"
-        time.sleep(0.001)
+    assert sem.await_waiters(1), "waiter never queued"
 
     sem.resize(1)
     sem.release()

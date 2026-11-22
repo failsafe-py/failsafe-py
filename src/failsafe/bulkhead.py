@@ -80,6 +80,29 @@ class Bulkhead:
         """How many callers are blocked waiting for a permit."""
         return self._semaphore.waiters
 
+    def await_waiters(self, count: int, timeout: float = 5.0) -> bool:
+        """Block until at least ``count`` callers are queued, or ``timeout`` elapses.
+
+        Args:
+            count: How many queued callers to wait for.
+            timeout: Seconds to wait before giving up.
+
+        Returns:
+            Whether the count was reached.
+        """
+        return self._semaphore.await_waiters(count, timeout)
+
+    def await_released(self, timeout: float = 5.0) -> bool:
+        """Block until every permit is free, or ``timeout`` elapses.
+
+        Args:
+            timeout: Seconds to wait before giving up.
+
+        Returns:
+            Whether every permit was released.
+        """
+        return self._semaphore.await_released(timeout)
+
     def try_acquire_permit(self) -> bool:
         """Acquire a permit only if one is free right now.
 

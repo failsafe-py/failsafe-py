@@ -24,7 +24,7 @@ from ._exceptions import (
     ThrottleExceeded,
     TimeoutExceeded,
 )
-from ._prioritizer import Prioritizer, ThresholdChangedEvent
+from ._prioritizer import CalibratedEvent, Prioritizer, ThresholdChangedEvent
 from ._sync import Failsafe
 from .adaptive_limiter import AdaptiveLimiter, LimitChangedEvent, queue_prioritizer
 from .adaptive_throttler import AdaptiveThrottler, throttle_prioritizer
@@ -60,6 +60,7 @@ __all__ = [
     "BulkheadFull",
     "Cache",
     "CachePolicy",
+    "CalibratedEvent",
     "CircuitBreaker",
     "CircuitBreakerOpen",
     "Condition",

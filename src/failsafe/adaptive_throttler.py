@@ -93,6 +93,7 @@ def throttle_prioritizer(
     level_tracker: LevelTracker | None = None,
     usage_tracker: UsageTracker | None = None,
     on_threshold_changed: Listener | None = None,
+    on_calibrated: Listener | None = None,
 ) -> Prioritizer:
     """Create a :class:`~failsafe._prioritizer.Prioritizer` driven by throttler failures.
 
@@ -100,6 +101,7 @@ def throttle_prioritizer(
         level_tracker: Where accepted levels are recorded. Shared if given.
         usage_tracker: Ranks users by usage so heavy users shed first. Optional.
         on_threshold_changed: Called when the rejection threshold moves.
+        on_calibrated: Called after every calibration, whether or not it moved.
 
     Returns:
         A prioritizer for :class:`AdaptiveThrottler` instances.
@@ -109,6 +111,7 @@ def throttle_prioritizer(
         level_tracker=level_tracker,
         usage_tracker=usage_tracker,
         on_threshold_changed=on_threshold_changed,
+        on_calibrated=on_calibrated,
     )
 
 
