@@ -95,7 +95,7 @@ def throttle_prioritizer(
     on_threshold_changed: Listener | None = None,
     on_calibrated: Listener | None = None,
 ) -> Prioritizer:
-    """Create a :class:`~failsafe._prioritizer.Prioritizer` driven by throttler failures.
+    """Create a [`Prioritizer`][failsafe.Prioritizer] driven by throttler failures.
 
     Args:
         level_tracker: Where accepted levels are recorded. Shared if given.
@@ -104,7 +104,7 @@ def throttle_prioritizer(
         on_calibrated: Called after every calibration, whether or not it moved.
 
     Returns:
-        A prioritizer for :class:`AdaptiveThrottler` instances.
+        A prioritizer for [`AdaptiveThrottler`][failsafe.AdaptiveThrottler] instances.
     """
     return Prioritizer(
         _ThrottlerRejectionStrategy(),
@@ -118,10 +118,10 @@ def throttle_prioritizer(
 class AdaptiveThrottler:
     """Rejects a growing share of executions while a resource keeps failing.
 
-    Unlike a :class:`~failsafe.CircuitBreaker`, which is open or closed for everyone,
+    Unlike a [`CircuitBreaker`][failsafe.CircuitBreaker], which is open or closed for everyone,
     the throttler rejects *probabilistically*: as the recent failure rate climbs past
     ``failure_rate_threshold``, each execution is likelier to be rejected with
-    :exc:`~failsafe.ThrottleExceeded`. Load sheds in proportion to the damage, and a
+    [`ThrottleExceeded`][failsafe.ThrottleExceeded]. Load sheds in proportion to the damage, and a
     recovering backend keeps receiving probe traffic because ``max_rejection_rate``
     stops short of rejecting everything.
 
@@ -140,14 +140,14 @@ class AdaptiveThrottler:
         execution_threshold: Executions required within the period before anything is
             rejected, so a single early failure cannot throttle a quiet resource.
         thresholding_period: The rolling window over which results count. Accepts
-            seconds or a :class:`~datetime.timedelta`. Defaults to one minute.
+            seconds or a `timedelta`. Defaults to one minute.
         max_rejection_rate: The ceiling on the rejection rate, from ``0`` to ``1``.
             Defaults to ``0.9``, leaving a tenth of traffic to probe for recovery.
         handle: What counts as a failure. Defaults to any exception.
         on_success: Called when an execution run through the throttler succeeds.
         on_failure: Called when an execution run through the throttler fails.
-        clock: The time source. Injectable so tests need not sleep.
-        rng: The source of rejection randomness. Injectable so tests are deterministic.
+        clock: Custom time source for delays and windows (e.g. for testing).
+        rng: Custom source of rejection randomness (e.g. for testing).
 
     Raises:
         ValueError: If a rate is outside ``0`` to ``1``, or the period is not positive.

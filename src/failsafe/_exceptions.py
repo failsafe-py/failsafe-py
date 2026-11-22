@@ -25,7 +25,7 @@ class FailsafeError(Exception):
 
 
 class RetriesExceeded(FailsafeError):
-    """A :class:`~failsafe.RetryPolicy` ran out of attempts or exceeded its duration.
+    """A [`RetryPolicy`][failsafe.RetryPolicy] ran out of attempts or exceeded its duration.
 
     Raised instead of the last failure unless the policy was built with
     ``return_last_failure=True``. The last failure is kept on the exception, and
@@ -46,7 +46,7 @@ class RetriesExceeded(FailsafeError):
 
 
 class CircuitBreakerOpen(FailsafeError):
-    """A :class:`~failsafe.CircuitBreaker` rejected an execution without running it.
+    """A [`CircuitBreaker`][failsafe.CircuitBreaker] rejected an execution without running it.
 
     Raised when the breaker is open, or is half-open and already admitting as many
     trial executions as it permits.
@@ -62,10 +62,10 @@ class CircuitBreakerOpen(FailsafeError):
 
 
 class TimeoutExceeded(FailsafeError):
-    """A :class:`~failsafe.Timeout` elapsed before the execution finished.
+    """A [`Timeout`][failsafe.Timeout] elapsed before the execution finished.
 
-    An ordinary failure: an outer :class:`~failsafe.RetryPolicy` may retry it, unlike
-    an :exc:`asyncio.CancelledError`, which is terminal.
+    An ordinary failure: an outer [`RetryPolicy`][failsafe.RetryPolicy] may retry it, unlike
+    an `asyncio.CancelledError`, which is terminal.
 
     Attributes:
         timeout: The configured limit in seconds.
@@ -77,7 +77,8 @@ class TimeoutExceeded(FailsafeError):
 
 
 class ThrottleExceeded(FailsafeError):
-    """An :class:`~failsafe.AdaptiveThrottler` rejected an execution without running it.
+    """An [`AdaptiveThrottler`][failsafe.AdaptiveThrottler] rejected an execution without
+        running it.
 
     Rejection is probabilistic: an identical call a moment later may be admitted, since
     the throttler always lets some traffic through to probe for recovery.
@@ -93,7 +94,7 @@ class ThrottleExceeded(FailsafeError):
 
 
 class RateLimitExceeded(FailsafeError):
-    """A :class:`~failsafe.RateLimiter` refused a permit within its max wait time.
+    """A [`RateLimiter`][failsafe.RateLimiter] refused a permit within its max wait time.
 
     Attributes:
         max_wait_time: The longest the execution was willing to wait, in seconds.
@@ -105,7 +106,7 @@ class RateLimitExceeded(FailsafeError):
 
 
 class BulkheadFull(FailsafeError):
-    """A :class:`~failsafe.Bulkhead` had no permit free within its max wait time.
+    """A [`Bulkhead`][failsafe.Bulkhead] had no permit free within its max wait time.
 
     Attributes:
         max_concurrency: The number of executions the bulkhead permits at once.
@@ -117,7 +118,7 @@ class BulkheadFull(FailsafeError):
 
 
 class LimitExceeded(FailsafeError):
-    """An :class:`~failsafe.AdaptiveLimiter` rejected an execution.
+    """An [`AdaptiveLimiter`][failsafe.AdaptiveLimiter] rejected an execution.
 
     Attributes:
         limit: The concurrency limit in force when the execution was rejected.
@@ -129,7 +130,7 @@ class LimitExceeded(FailsafeError):
 
 
 class BudgetExceeded(FailsafeError):
-    """A :class:`~failsafe.Budget` refused a retry.
+    """A [`Budget`][failsafe.Budget] refused a retry.
 
     Raised instead of the last failure: the attempt was never made, so there is no
     later result to report. The failure that prompted the retry is chained as

@@ -2,7 +2,7 @@
 
 Go needs four builder families (``HandleErrors``, ``HandleErrorTypes``, ``HandleResult``,
 ``HandleIf``) because ``errors.Is`` is not ``errors.As`` and generics split results from
-errors. :func:`isinstance` collapses all four into one type, reused wherever Go has
+errors. `isinstance` collapses all four into one type, reused wherever Go has
 a condition family: ``handle=`` and ``abort=`` on retry, ``handle=`` on fallback and the
 circuit breaker.
 """
@@ -52,26 +52,26 @@ One of:
 - a tuple or list of exception types, OR'ed together
 - a callable taking ``(result, exception)`` and returning a bool
 - any other value, matched against the returned value with ``==``
-- a :class:`Result`, for a value that would otherwise read as one of the above:
+- a [`Result`][failsafe.Result], for a value that would otherwise read as one of the above:
   a tuple, a list, or anything callable. A class is callable, so matching a returned
   instance needs ``handle=Result(instance)``; a bare class is taken as a predicate.
 
-Typed as :data:`~typing.Any` deliberately. Bare values are accepted, so the set of
+Typed as `Any` deliberately. Bare values are accepted, so the set of
 legal arguments is "almost anything", and a union spelling that out would reject
 valid code while promising a precision it cannot deliver. The constructor raises
-:exc:`TypeError` on the shapes that are genuinely ambiguous.
+`TypeError` on the shapes that are genuinely ambiguous.
 """
 
 
 def matches_exception(exc: BaseException | None, types: tuple[type[Exception], ...]) -> bool:
     """Whether ``exc`` or anything it was explicitly raised from is one of ``types``.
 
-    ``errors.Is`` follows Go's ``Unwrap``; :func:`isinstance` follows nothing, so the
+    ``errors.Is`` follows Go's ``Unwrap``; `isinstance` follows nothing, so the
     chain is walked here. Only ``__cause__`` is followed, never ``__context__``: implicit
     context would match exceptions raised incidentally while handling another, which Go
     has no equivalent of. The walk is depth-limited and cycle-safe.
 
-    An :exc:`ExceptionGroup` matches if any of its leaves does.
+    An `ExceptionGroup` matches if any of its leaves does.
     """
     seen: set[int] = set()
     current: BaseException | None = exc
@@ -122,7 +122,7 @@ def _as_sequence_predicate(condition: Sequence[Any]) -> tuple[Predicate, bool]:
 
     A collection means "any of these", so a bare value inside one cannot also mean
     "this exact value" without colliding with the exception-type reading. Members must
-    say which they are: exception types, or :class:`Result` for values.
+    say which they are: exception types, or [`Result`][failsafe.Result] for values.
     """
     if not condition:
         raise TypeError(
@@ -163,7 +163,7 @@ class FailureConditions:
     Compiled once at policy construction.
 
     Args:
-        condition: The configured condition, or :data:`UNSET` for Go's default.
+        condition: The configured condition, or `UNSET` for Go's default.
     """
 
     __slots__ = ("_checks_errors", "_predicates")

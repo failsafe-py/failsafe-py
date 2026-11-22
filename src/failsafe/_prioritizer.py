@@ -2,7 +2,7 @@
 
 Ports failsafe-go's ``internal.BasePrioritizer``. A prioritizer gathers queueing or
 rejection statistics from every policy registered with it and, on each
-:meth:`Prioritizer.calibrate`, turns them into one rejection rate and the level below
+`Prioritizer.calibrate`, turns them into one rejection rate and the level below
 which executions are rejected. Sharing one prioritizer across several policies lets
 them shed load based on overall system pressure rather than each one's local view.
 """
@@ -39,7 +39,7 @@ _logger = logging.getLogger("failsafe.prioritizer")
 
 @dataclass(frozen=True, slots=True)
 class ThresholdChangedEvent:
-    """A :class:`Prioritizer`'s rejection threshold changed.
+    """A [`Prioritizer`][failsafe.Prioritizer]'s rejection threshold changed.
 
     Attributes:
         old_threshold: The level below which executions were previously rejected.
@@ -52,7 +52,7 @@ class ThresholdChangedEvent:
 
 @dataclass(frozen=True, slots=True)
 class CalibratedEvent:
-    """A :class:`Prioritizer` finished a calibration.
+    """A [`Prioritizer`][failsafe.Prioritizer] finished a calibration.
 
     Fires on every calibration, including those that left the threshold alone, so a
     caller can confirm the schedule is running rather than only that it changed
@@ -93,10 +93,10 @@ class RejectionStrategy(Protocol):
 class Prioritizer:
     """Decides which priority levels to reject while the system is overloaded.
 
-    Policies register themselves; :meth:`calibrate` then samples them all and sets the
+    Policies register themselves; `calibrate` then samples them all and sets the
     rejection threshold from the recorded distribution of levels. Nothing recalculates
-    on its own — call :meth:`calibrate` on an interval, or use
-    :meth:`scheduled_calibrations` to run it on a background thread.
+    on its own — call `calibrate` on an interval, or use
+    `scheduled_calibrations` to run it on a background thread.
 
     Args:
         strategy: How to combine registered policies' statistics.
@@ -227,7 +227,7 @@ class Prioritizer:
     def level_for(self, priority: Priority | None = None) -> int:
         """The level for the execution in scope.
 
-        A user in scope with a :class:`~failsafe.priority.UsageTracker` configured takes
+        A user in scope with a [`UsageTracker`][failsafe.UsageTracker] configured takes
         precedence, so heavy users rank below light ones within the same priority. Then
         an explicit level or priority from the surrounding scope, and finally ``0``.
 

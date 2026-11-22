@@ -138,16 +138,17 @@ class RateLimiter:
 
     Two flavours, chosen by constructor:
 
-    - **Smooth** (:meth:`smooth`) spreads permits evenly, one every interval, so a
+    - **Smooth** (`smooth`) spreads permits evenly, one every interval, so a
       burst of callers is paced rather than admitted together.
-    - **Bursty** (:meth:`bursty`) refills a fixed allowance at the start of each
+    - **Bursty** (`bursty`) refills a fixed allowance at the start of each
       period, permitting bursts up to that allowance.
 
     Both reserve permits by pure arithmetic: a reservation returns the time the caller
     must wait, and waiting happens in the driver, so a reserved permit is never lost.
 
     By default an execution that cannot proceed immediately fails with
-    :exc:`~failsafe.RateLimitExceeded`. Pass ``max_wait_time`` to let it wait instead.
+    [`RateLimitExceeded`][failsafe.RateLimitExceeded]. Pass ``max_wait_time`` to let it wait
+        instead.
 
     One instance models one resource, so share it across every call that reaches it::
 
@@ -195,14 +196,14 @@ class RateLimiter:
         Args:
             max_executions: Executions permitted per ``period``.
             period: The period over which ``max_executions`` are spread. Accepts
-                seconds or a :class:`~datetime.timedelta`.
+                seconds or a `timedelta`.
             max_rate: The interval between permitted executions, as an alternative to
                 ``max_executions`` and ``period``.
             max_wait_time: How long an execution may wait for a permit before being
                 rejected. Applies only to executions run through a
-                :class:`~failsafe.Failsafe`, never to the standalone methods.
+                [`Failsafe`][failsafe.Failsafe], never to the standalone methods.
             on_rate_limit_exceeded: Called when an execution is rejected.
-            clock: The time source. Injectable so tests need not sleep.
+            clock: Custom time source for permit scheduling (e.g. for testing).
 
         Returns:
             A smooth rate limiter.
@@ -242,12 +243,12 @@ class RateLimiter:
         Args:
             max_executions: Executions permitted in each period.
             period: The length of a period. Accepts seconds or a
-                :class:`~datetime.timedelta`.
+                `timedelta`.
             max_wait_time: How long an execution may wait for a permit before being
                 rejected. Applies only to executions run through a
-                :class:`~failsafe.Failsafe`, never to the standalone methods.
+                [`Failsafe`][failsafe.Failsafe], never to the standalone methods.
             on_rate_limit_exceeded: Called when an execution is rejected.
-            clock: The time source. Injectable so tests need not sleep.
+            clock: Custom time source for permit scheduling (e.g. for testing).
 
         Returns:
             A bursty rate limiter.
@@ -302,7 +303,7 @@ class RateLimiter:
         """Acquire permits, blocking the calling thread until they are available.
 
         Never rejects: ``max_wait_time`` applies only to executions run through a
-        :class:`~failsafe.Failsafe`, matching Go. Use :meth:`try_reserve_permit` for a
+        [`Failsafe`][failsafe.Failsafe], matching Go. Use `try_reserve_permit` for a
         standalone bound on the wait.
 
         Args:

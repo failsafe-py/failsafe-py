@@ -42,15 +42,15 @@ class Failsafe:
     per backend and reuse it: stateful policies model the health of a backend, so
     constructing them per call site fragments their signal.
 
-    The result type is inferred from the function passed to :meth:`call`, so one
+    The result type is inferred from the function passed to `call`, so one
     composition can guard calls returning different types.
 
     This type is concurrency safe, and shares its policies' state with any
-    :class:`~failsafe.AsyncFailsafe` built from the same policy objects.
+    [`AsyncFailsafe`][failsafe.AsyncFailsafe] built from the same policy objects.
 
     Args:
         *policies: Policies, outermost first.
-        clock: The time source for delays and deadlines.
+        clock: Custom time source for delays and deadlines (e.g. for testing).
     """
 
     __slots__ = ("_chain", "_clock", "_pool", "policies")
@@ -122,7 +122,7 @@ class Failsafe:
     ) -> Outcome[R]:
         """Drive a policy generator to completion, servicing what it yields.
 
-        ``deadline`` makes the pump cooperative: an enclosing :class:`Race` stops it at
+        ``deadline`` makes the pump cooperative: an enclosing `Race` stops it at
         the next instruction boundary once the time is past, which is as close to
         interruption as sync Python gets without a thread.
         """

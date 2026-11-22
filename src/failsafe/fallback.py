@@ -19,7 +19,8 @@ class Fallback:
 
     Usually the outermost policy, so that it catches whatever the inner ones could not
     handle. Note that by default *any* exception fires the fallback, including
-    :exc:`~failsafe.RetriesExceeded` and :exc:`~failsafe.CircuitBreakerOpen` from inner
+    [`RetriesExceeded`][failsafe.RetriesExceeded] and
+        [`CircuitBreakerOpen`][failsafe.CircuitBreakerOpen] from inner
     policies; narrow it with ``handle`` if that is not wanted.
 
     Example:
@@ -28,7 +29,7 @@ class Fallback:
 
     Args:
         value: The result to return instead. Pass this or ``fn``, not both.
-        fn: Called with the :class:`~failsafe.Execution` to compute the result. Its
+        fn: Called with the [`Execution`][failsafe.Execution] to compute the result. Its
             ``last_result`` and ``last_exception`` describe the failure being handled.
             An exception it raises replaces the original.
         handle: What counts as a failure worth falling back from. Defaults to any

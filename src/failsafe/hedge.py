@@ -27,25 +27,25 @@ class HedgePolicy:
     be replaced. Retrying only after a timeout pays the timeout first. A hedge starts
     a second attempt while the first is still running and takes whichever finishes.
 
-    Unlike :class:`~failsafe.RetryPolicy`, attempts overlap. The losers are cancelled
+    Unlike [`RetryPolicy`][failsafe.RetryPolicy], attempts overlap. The losers are cancelled
     for real once a winner is accepted::
 
         api = AsyncFailsafe(HedgePolicy(0.1))          # hedge after 100ms
         api = AsyncFailsafe(HedgePolicy(0.1, max_hedges=2))
 
-    **Async only.** Under :class:`~failsafe.Failsafe` this raises
-    :exc:`NotImplementedError`: a synchronous call cannot be cancelled, so the losing
+    **Async only.** Under [`Failsafe`][failsafe.Failsafe] this raises
+    `NotImplementedError`: a synchronous call cannot be cancelled, so the losing
     attempts would run to completion against the service this policy is trying to
     protect. The capability gap is deliberate rather than papered over with threads.
 
     **Hedges multiply load.** Every attempt is a real request, so a policy that hedges
     eagerly turns a slow dependency into an overloaded one. Hedge on a delay well into
-    the tail, and give the policy a :class:`~failsafe.Budget` when the dependency is
+    the tail, and give the policy a [`Budget`][failsafe.Budget] when the dependency is
     shared.
 
     Args:
         delay: How long to wait before starting another attempt. Seconds, a
-            timedelta, or a callable taking the :class:`~failsafe.Execution` and
+            timedelta, or a callable taking the [`Execution`][failsafe.Execution] and
             returning seconds, or ``None`` to stop hedging. Exactly one of ``delay``
             or ``quantile`` is required.
         quantile: Hedge when an execution exceeds this quantile of recent accepted
@@ -59,7 +59,7 @@ class HedgePolicy:
         max_hedges: How many extra attempts may be started beyond the first.
         cancel_on: Which outcomes end the execution and cancel the attempts still
             running. Defaults to the first outcome to arrive, whatever it is.
-        budget: A :class:`~failsafe.Budget` limiting what share of in-flight work
+        budget: A [`Budget`][failsafe.Budget] limiting what share of in-flight work
             hedges may become. When it is spent the policy stops hedging, and the
             attempts already running still produce a result.
         on_hedge: Called before each hedged attempt starts.

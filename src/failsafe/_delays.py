@@ -27,8 +27,8 @@ __all__ = ["Backoff", "Delay", "Fixed", "Jitter", "RandomDelay", "seconds"]
 def seconds(duration: float | timedelta) -> float:
     """Normalize a duration to float seconds.
 
-    Durations are floats throughout, matching :func:`time.sleep`, :func:`asyncio.timeout`
-    and httpx, but a :class:`~datetime.timedelta` is accepted anywhere one is given.
+    Durations are floats throughout, matching `time.sleep`, `asyncio.timeout`
+    and httpx, but a `timedelta` is accepted anywhere one is given.
 
     Args:
         duration: Seconds, or a timedelta.
@@ -166,11 +166,11 @@ Delay: TypeAlias = (
 
 One of:
 
-- a number of seconds or a :class:`~datetime.timedelta`, for a fixed delay
-- :class:`Fixed`, :class:`Backoff` or :class:`RandomDelay`
+- a number of seconds or a `timedelta`, for a fixed delay
+- [`Fixed`][failsafe.Fixed], [`Backoff`][failsafe.Backoff] or [`RandomDelay`][failsafe.RandomDelay]
 - a callable returning seconds, or ``None`` for no delay. It receives the
-  :class:`~failsafe.Execution`, or ``None`` when there is none to report: a circuit
-  breaker opened by :meth:`~failsafe.CircuitBreaker.open` rather than by a failure has
+  [`Execution`][failsafe.Execution], or ``None`` when there is none to report: a circuit
+  breaker opened by `open` rather than by a failure has
   no execution to compute a delay from.
 """
 

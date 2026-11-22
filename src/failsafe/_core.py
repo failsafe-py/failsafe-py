@@ -1,11 +1,11 @@
 """The sans-io execution core: outcomes, instructions, ``Execution``, composition.
 
 Policy logic is written once, as a generator that yields instructions. A driver
-(:mod:`failsafe._sync` or :mod:`failsafe._async`) decides how to service them, which
+(`_sync` or `_async`) decides how to service them, which
 is the only place sync and async differ. One policy instance therefore drives both,
 sharing its state across them.
 
-Nothing here imports :mod:`asyncio` or calls :func:`time.sleep`; blocking belongs to
+Nothing here imports `asyncio` or calls `time.sleep`; blocking belongs to
 the drivers.
 """
 
@@ -60,7 +60,7 @@ class Outcome(Generic[R]):
 class Clock(Protocol):
     """The time seam. Every delay in the library goes through one of these.
 
-    Tests install a :class:`FakeClock` so that no suite ever sleeps for real.
+    Tests install a `FakeClock` so that no suite ever sleeps for real.
     """
 
     def now(self) -> float:
@@ -74,20 +74,20 @@ class Clock(Protocol):
 
 
 class SystemClock:
-    """The default :class:`Clock`, backed by :func:`time.monotonic`."""
+    """The default `Clock`, backed by `time.monotonic`."""
 
     __slots__ = ()
 
     def now(self) -> float:
-        """Return :func:`time.monotonic`."""
+        """Return `time.monotonic`."""
         return time.monotonic()
 
     def sleep(self, seconds: float) -> None:
-        """Block the calling thread via :func:`time.sleep`."""
+        """Block the calling thread via `time.sleep`."""
         time.sleep(seconds)
 
     async def sleep_async(self, seconds: float) -> None:
-        """Suspend the calling task via :func:`asyncio.sleep`."""
+        """Suspend the calling task via `asyncio.sleep`."""
         import asyncio
 
         await asyncio.sleep(seconds)
@@ -97,7 +97,7 @@ SYSTEM_CLOCK = SystemClock()
 
 
 class FakeClock:
-    """A :class:`Clock` whose time only moves when something sleeps on it.
+    """A `Clock` whose time only moves when something sleeps on it.
 
     Sleeping advances the clock instantly, so tests of delays, backoffs and deadlines
     are both exact and fast.
@@ -146,10 +146,10 @@ class Execution:
 
     Mirrors failsafe-go's ``ExecutionInfo`` / ``ExecutionAttempt``. There is no
     ``cancelled`` flag: sync mode supports deadlines rather than cancellation, and
-    async cancellation surfaces as :exc:`asyncio.CancelledError`.
+    async cancellation surfaces as `asyncio.CancelledError`.
 
     Attributes are maintained by the core; user code reads them via
-    :func:`failsafe.current_execution`.
+    [`current_execution`][failsafe.current_execution].
 
     Hedged attempts run concurrently against copies of this object: the counts are
     shared, while the last result and the attempt's start time belong to the attempt.
@@ -277,7 +277,7 @@ _CURRENT: contextvars.ContextVar[Execution] = contextvars.ContextVar("failsafe_e
 
 
 def current_execution() -> Execution | None:
-    """Return the :class:`Execution` in progress, or ``None`` outside one.
+    """Return the [`Execution`][failsafe.Execution] in progress, or ``None`` outside one.
 
     The replacement for failsafe-go's ``GetWithExecution``: a function running under a
     policy composition reads its attempt count, elapsed time or remaining deadline
@@ -300,21 +300,21 @@ def set_current_execution(ex: Execution) -> contextvars.Token[Execution]:
 class Invoke:
     """Call the user function and capture its outcome.
 
-    The driver catches :class:`Exception`, never :class:`BaseException`, so a
-    :exc:`KeyboardInterrupt` or :exc:`asyncio.CancelledError` propagates rather than
+    The driver catches `Exception`, never `BaseException`, so a
+    `KeyboardInterrupt` or `asyncio.CancelledError` propagates rather than
     becoming a retryable failure.
     """
 
 
 INVOKE = Invoke()
-"""The singleton :class:`Invoke`, yielded instead of allocating one per attempt."""
+"""The singleton `Invoke`, yielded instead of allocating one per attempt."""
 
 
 @dataclass(frozen=True, slots=True)
 class Sleep:
     """Wait for ``seconds`` before resuming the policy.
 
-    Serviced by :func:`time.sleep` or :func:`asyncio.sleep` via the clock, so an async
+    Serviced by `time.sleep` or `asyncio.sleep` via the clock, so an async
     sleep remains interruptible by cancellation.
     """
 
@@ -325,7 +325,7 @@ class Sleep:
 class Acquire:
     """Acquire a permit from ``semaphore``, blocking up to ``timeout`` seconds.
 
-    Sent back to the policy as a :class:`bool`. The policy is responsible for
+    Sent back to the policy as a `bool`. The policy is responsible for
     releasing the permit in a ``finally`` block, which also covers a driver
     abandoning the execution.
     """
@@ -338,11 +338,11 @@ class Acquire:
 class Race:
     """Run ``inner`` under a deadline, abandoning it after ``seconds``.
 
-    Sent back to the policy as the inner :class:`Outcome`, or ``None`` if the deadline
+    Sent back to the policy as the inner `Outcome`, or ``None`` if the deadline
     elapsed first. The two drivers differ fundamentally here, which is why this is an
     instruction rather than policy code:
 
-    - async interrupts the attempt mid-await via :func:`asyncio.timeout`;
+    - async interrupts the attempt mid-await via `asyncio.timeout`;
     - sync is cooperative, checking the deadline between instructions, unless
       ``interrupt`` asks for a worker thread.
     """
@@ -372,7 +372,7 @@ class HedgeControl(Protocol):
         ...
 
     def finish_hedge(self) -> None:
-        """Release whatever :meth:`start_hedge` admitted."""
+        """Release whatever `start_hedge` admitted."""
         ...
 
     def record_duration(self, ex: Execution) -> None:
@@ -388,7 +388,7 @@ class Hedge:
     joins it. The first outcome ``control`` accepts wins and the rest are cancelled
     for real, which only asyncio can do, so the sync driver rejects this instruction.
 
-    Sent back to the policy as the winning :class:`Outcome`.
+    Sent back to the policy as the winning `Outcome`.
     """
 
     inner: Any
@@ -436,7 +436,7 @@ def compose(policies: tuple[Policy, ...]) -> Step:
     matching failsafe-go's ``failsafe.With(...)`` ordering, where the outermost policy
     is called first and the innermost handles the function's result first.
 
-    Called once per :class:`failsafe.Failsafe`, never per call: re-composing per call
+    Called once per [`Failsafe`][failsafe.Failsafe], never per call: re-composing per call
     costs roughly as much as the rest of the core put together.
 
     Args:
