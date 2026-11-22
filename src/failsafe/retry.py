@@ -35,28 +35,30 @@ class RetryPolicy:
         >>> Failsafe(retry).call(connect, host)
 
     Args:
+        max_retries: How many retries to allow after the first attempt, so the default
+            of 2 permits 3 attempts. ``None`` allows unlimited retries, bounded only by
+            ``max_duration``.
+        delay: How long to wait between attempts. Seconds, a timedelta,
+            [`Fixed`][failsafe.Fixed], [`Backoff`][failsafe.Backoff],
+            [`RandomDelay`][failsafe.RandomDelay], or a callable taking the execution.
         handle: What counts as a failure worth retrying. Defaults to any exception.
             A result-only condition such as ``handle=None`` adds to the default rather
             than replacing it, matching Go.
         abort: What should stop retrying immediately, failing with that result rather
-            than [`RetriesExceeded`][failsafe.RetriesExceeded]. Only evaluated for outcomes that
-            ``handle`` already considers failures.
-        delay: How long to wait between attempts. Seconds, a timedelta,
-            [`Fixed`][failsafe.Fixed], [`Backoff`][failsafe.Backoff],
-            [`RandomDelay`][failsafe.RandomDelay], or a callable taking the execution.
-        max_retries: How many retries to allow after the first attempt, so the default
-            of 2 permits 3 attempts. ``None`` allows unlimited retries, bounded only by
-            ``max_duration``.
+            than [`RetriesExceeded`][failsafe.RetriesExceeded]. Only evaluated for
+            outcomes that ``handle`` already considers failures.
         max_duration: Give up once this many seconds have elapsed since the execution
-            began. Delays are clamped so a long backoff never overshoots it.
+            began, failing with the last failure rather than a timeout. Delays are
+            clamped so a long backoff never overshoots it.
         return_last_failure: Raise or return the last failure itself rather than
             wrapping it in [`RetriesExceeded`][failsafe.RetriesExceeded].
         budget: A [`Budget`][failsafe.Budget] limiting what share of in-flight work
             retries may become. Share one instance across the policies guarding the
             same dependency. Retries refused by the budget fail with
             [`BudgetExceeded`][failsafe.BudgetExceeded].
-        on_retry: Called after each delay, before the next attempt.
-        on_retry_scheduled: Called before each delay, with the delay about to elapse.
+        on_retry_scheduled: Called when a retry is scheduled, *before* its delay, with
+            the delay about to elapse. Use it to observe a pending backoff.
+        on_retry: Called *after* that delay, immediately before the next attempt.
         on_retries_exceeded: Called once when the limits are reached.
         on_abort: Called once when an ``abort`` condition matches.
         on_success: Called when an attempt is not a failure.
@@ -87,15 +89,15 @@ class RetryPolicy:
     def __init__(
         self,
         *,
+        max_retries: int | None = 2,
+        delay: Delay | None = None,
         handle: Condition = UNSET,
         abort: Condition = UNSET,
-        delay: Delay | None = None,
-        max_retries: int | None = 2,
         max_duration: float | timedelta | None = None,
         return_last_failure: bool = False,
         budget: Budget | None = None,
-        on_retry: Listener | None = None,
         on_retry_scheduled: Listener | None = None,
+        on_retry: Listener | None = None,
         on_retries_exceeded: Listener | None = None,
         on_abort: Listener | None = None,
         on_success: Listener | None = None,
