@@ -10,30 +10,11 @@ circuit breaker.
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
 from typing import Any, TypeAlias
 
-__all__ = ["Condition", "Result"]
+__all__ = ["Condition"]
 
 _MAX_CAUSE_DEPTH = 20
-
-
-@dataclass(frozen=True, slots=True)
-class Result:
-    """Matches an execution that returned ``value``, the analogue of Go's ``HandleResult``.
-
-    Only needed where a bare value would read as something else: inside a collection,
-    which already means "any of these conditions", or for a value that is itself a
-    tuple, a list, or callable. Everywhere else pass the value directly, as
-    ``handle="bad"`` or ``handle=None``.
-
-    Example:
-        ```python
-        RetryPolicy(handle=[Result("a"), ConnectionError])  # value OR exception
-        ```
-    """
-
-    value: Any
 
 
 Predicate: TypeAlias = Callable[[Any, "Exception | None"], bool]
@@ -51,12 +32,12 @@ Condition: TypeAlias = Any
 One of:
 
 - an exception type, matched against the exception and its ``__cause__`` chain
-- a tuple or list of exception types, OR'ed together
+- a tuple or list of exception types or predicates, OR'ed together
 - a callable taking ``(result, exception)`` and returning a bool
 - any other value, matched against the returned value with ``==``
-- a [`Result`][failsafe.Result], for a value that would otherwise read as one of the above:
-  a tuple, a list, or anything callable. A class is callable, so matching a returned
-  instance needs ``handle=Result(instance)``; a bare class is taken as a predicate.
+
+A value that would read as one of the above - a tuple, a list, anything callable,
+including a class - needs a predicate: ``handle=lambda result, exc: result == (1, 2)``.
 
 Typed as `Any` deliberately. Bare values are accepted, so the set of
 legal arguments is "almost anything", and a union spelling that out would reject
@@ -103,8 +84,6 @@ def _value_predicate(expected: Any) -> tuple[Predicate, bool]:
 
 def _as_predicate(condition: Any) -> tuple[Predicate, bool]:
     """Compile one condition into a predicate, and whether it inspects errors."""
-    if isinstance(condition, Result):
-        return _value_predicate(condition.value)
     if _is_exception_type(condition):
         types = (condition,)
         return lambda result, exc: matches_exception(exc, types), True
@@ -122,22 +101,21 @@ def _as_predicate(condition: Any) -> tuple[Predicate, bool]:
 def _as_sequence_predicate(condition: Sequence[Any]) -> tuple[Predicate, bool]:
     """Compile a tuple or list of conditions, OR'ed together.
 
-    A collection means "any of these", so a bare value inside one cannot also mean
-    "this exact value" without colliding with the exception-type reading. Members must
-    say which they are: exception types, or [`Result`][failsafe.Result] for values.
+    A collection means "any of these", so its members must be conditions in their own
+    right: exception types or predicates. A value belongs in a predicate.
     """
     if not condition:
         raise TypeError(
             "invalid condition (): an empty collection matches nothing, which is "
             "never useful; omit the argument instead"
         )
-    bare = [item for item in condition if not (_is_exception_type(item) or _wrapped(item))]
+    bare = [item for item in condition if not (_is_exception_type(item) or callable(item))]
     if bare:
         offender = bare[0]
         raise TypeError(
             f"invalid condition {condition!r}: {offender!r} is ambiguous inside a "
-            f"collection, which already means a set of conditions. Write "
-            f"Result({offender!r}) to match it as a returned value."
+            f"collection, which already means a set of conditions. Match it with a "
+            f"predicate, as lambda result, exc: result == {offender!r}."
         )
     compiled = [_as_predicate(item) for item in condition]
     predicates = [p for p, _ in compiled]
@@ -146,11 +124,6 @@ def _as_sequence_predicate(condition: Sequence[Any]) -> tuple[Predicate, bool]:
         lambda result, exc: any(predicate(result, exc) for predicate in predicates),
         checks_errors,
     )
-
-
-def _wrapped(item: Any) -> bool:
-    """Whether ``item`` states its own meaning: a Result, a predicate, or a collection."""
-    return isinstance(item, Result) or callable(item) or isinstance(item, (tuple, list))
 
 
 class FailureConditions:

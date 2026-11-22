@@ -6,4 +6,3 @@ Guide: [Policies](https://failsafe-py.github.io/policies)
 
 ::: failsafe.Condition
 
-::: failsafe.Result

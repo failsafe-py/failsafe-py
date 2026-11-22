@@ -194,4 +194,3 @@ class Failsafe:
             return outcome
         finally:
             ex.deadline = previous_deadline
-
