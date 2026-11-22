@@ -2,14 +2,47 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Generator
+import contextlib
+import contextvars
+from collections.abc import Callable, Generator, Iterator
 from typing import Any, Protocol
 
 from ._conditions import UNSET, Condition, FailureConditions
 from ._core import Execution, Instruction, Outcome, Step
 from ._events import ExecutionCompletedEvent, ExecutionEvent, Listener, Listeners
 
-__all__ = ["Cache", "CachePolicy"]
+__all__ = ["Cache", "CachePolicy", "cache_key", "current_cache_key"]
+
+_CACHE_KEY: contextvars.ContextVar[str] = contextvars.ContextVar("failsafe_cache_key")
+
+
+@contextlib.contextmanager
+def cache_key(key: str) -> Iterator[None]:
+    """Set the cache key for the enclosed block, overriding a policy's ``key=``.
+
+    Go reads its cache key from the `Context`; this is the equivalent, and the same
+    ambient mechanism [`priority_scope`][failsafe.priority_scope] uses. Reach for it
+    when the key belongs to the request rather than to the arguments — a tenant, a
+    revision, a trace:
+
+    ```python
+    with cache_key(f"{tenant}:config"):
+        config = api.call(fetch_config)
+    ```
+
+    Args:
+        key: The cache key for executions inside the block.
+    """
+    token = _CACHE_KEY.set(key)
+    try:
+        yield
+    finally:
+        _CACHE_KEY.reset(token)
+
+
+def current_cache_key() -> str | None:
+    """Return the cache key in scope, or ``None``."""
+    return _CACHE_KEY.get(None)
 
 
 class Cache(Protocol):
@@ -35,7 +68,7 @@ class Cache(Protocol):
 class CachePolicy:
     """Serves results from a cache, skipping the execution entirely on a hit.
 
-    The key is a function of the call arguments, shaped like
+    The key usually comes from the call arguments, shaped like
     `functools.lru_cache`:
 
     ```python
@@ -43,6 +76,10 @@ class CachePolicy:
     users = Failsafe(cache)
     users.call(fetch_user, 42)
     ```
+
+    A [`cache_key`][failsafe.cache_key] block overrides that, for keys belonging to
+    the request rather than the arguments. One of the two must supply a key: with
+    neither, the execution runs uncached.
 
     Composed outermost, a hit skips every policy inside it, which is usually what you
     want: a cached result needs no retry, no circuit breaker and no rate limiter.
@@ -53,7 +90,8 @@ class CachePolicy:
     Args:
         cache: The backend, satisfying [`Cache`][failsafe.Cache].
         key: Called with the execution's arguments, returning the cache key, or
-            ``None`` to skip the cache for this call.
+            ``None`` to skip the cache for this call. A
+            [`cache_key`][failsafe.cache_key] block takes precedence over it.
         cache_if: Which outcomes to cache. Defaults to any outcome that did not raise.
         on_hit: Called when a cached result is served.
         on_miss: Called when no cached result was found.
@@ -71,7 +109,7 @@ class CachePolicy:
         self,
         cache: Cache,
         *,
-        key: Callable[..., str | None],
+        key: Callable[..., str | None] | None = None,
         cache_if: Condition = UNSET,
         on_hit: Listener | None = None,
         on_miss: Listener | None = None,
@@ -91,7 +129,7 @@ class CachePolicy:
         """Wrap ``inner`` so a cached result short-circuits it."""
 
         def step(ex: Execution) -> Generator[Instruction, Any, Outcome[Any]]:
-            key = self._key(*ex.args, **ex.kwargs)
+            key = self._resolve_key(ex)
             if key is not None:
                 value, found = self._cache.get(key)
                 if found:
@@ -110,6 +148,19 @@ class CachePolicy:
             return outcome
 
         return step
+
+    def _resolve_key(self, ex: Execution) -> str | None:
+        """The cache key for this execution, or ``None`` to skip the cache.
+
+        A surrounding [`cache_key`][failsafe.cache_key] block wins over ``key=``,
+        matching Go, where a key in the context overrides the one on the policy.
+        """
+        scoped = current_cache_key()
+        if scoped is not None:
+            return scoped
+        if self._key is None:
+            return None
+        return self._key(*ex.args, **ex.kwargs)
 
     def _should_cache(self, outcome: Outcome[Any]) -> bool:
         """Whether this outcome should be stored."""

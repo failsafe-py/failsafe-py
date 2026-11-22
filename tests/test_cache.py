@@ -15,6 +15,8 @@ from failsafe import (
     ExecutionEvent,
     Failsafe,
     RetryPolicy,
+    cache_key,
+    current_cache_key,
 )
 from failsafe._core import FakeClock
 
@@ -225,3 +227,74 @@ def test_one_cache_shared_between_sync_and_async() -> None:
     assert Failsafe(policy, clock=FakeClock()).call(sync_fetch, "k") == "value"
     assert asyncio.run(AsyncFailsafe(policy, clock=FakeClock()).call(async_fetch, "k")) == "value"
     assert calls == [1], "the async call must hit what the sync call stored"
+
+
+def test_a_cache_key_block_overrides_the_key_callable() -> None:
+    """Go reads the key from the context, which beats the one on the policy."""
+    cache = DictCache()
+    calls: list[int] = []
+
+    def fetch(user_id: int) -> str:
+        calls.append(user_id)
+        return f"user{user_id}"
+
+    failsafe = Failsafe(CachePolicy(cache, key=lambda uid: f"arg:{uid}"), clock=FakeClock())
+
+    with cache_key("ctx:override"):
+        assert failsafe.call(fetch, 1) == "user1"
+    assert list(cache.store) == ["ctx:override"]
+
+    # Outside the block the callable is in charge again.
+    assert failsafe.call(fetch, 1) == "user1"
+    assert sorted(cache.store) == ["arg:1", "ctx:override"]
+    assert calls == [1, 1]
+
+
+def test_a_cache_key_block_serves_hits() -> None:
+    """The override is a real key, not just a label: it hits on the way back in."""
+    cache = DictCache()
+    calls: list[int] = []
+
+    def fetch(user_id: int) -> str:
+        calls.append(user_id)
+        return f"user{user_id}"
+
+    failsafe = Failsafe(CachePolicy(cache, key=lambda uid: f"arg:{uid}"), clock=FakeClock())
+
+    with cache_key("tenant:config"):
+        assert failsafe.call(fetch, 1) == "user1"
+        # Different arguments, same scoped key: still a hit.
+        assert failsafe.call(fetch, 999) == "user1"
+
+    assert calls == [1], "the second call was served from the cache"
+
+
+def test_a_policy_may_rely_on_the_block_alone() -> None:
+    """With no key= the contextvar is the only source, and absence means uncached."""
+    cache = DictCache()
+    calls: list[int] = []
+
+    def fetch() -> str:
+        calls.append(1)
+        return "value"
+
+    failsafe = Failsafe(CachePolicy(cache), clock=FakeClock())
+
+    with cache_key("only:ctx"):
+        assert failsafe.call(fetch) == "value"
+        assert failsafe.call(fetch) == "value"
+    assert calls == [1], "the block supplied a key, so the second call hit"
+
+    assert failsafe.call(fetch) == "value"
+    assert failsafe.call(fetch) == "value"
+    assert calls == [1, 1, 1], "with no key at all, nothing is cached"
+
+
+def test_the_cache_key_scope_is_restored() -> None:
+    assert current_cache_key() is None
+    with cache_key("outer"):
+        assert current_cache_key() == "outer"
+        with cache_key("inner"):
+            assert current_cache_key() == "inner"
+        assert current_cache_key() == "outer"
+    assert current_cache_key() is None

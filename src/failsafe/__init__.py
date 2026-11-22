@@ -30,7 +30,7 @@ from .adaptive_limiter import AdaptiveLimiter, LimitChangedEvent, queue_prioriti
 from .adaptive_throttler import AdaptiveThrottler, throttle_prioritizer
 from .budget import Budget, BudgetExceededEvent
 from .bulkhead import Bulkhead
-from .cache import Cache, CachePolicy
+from .cache import Cache, CachePolicy, cache_key, current_cache_key
 from .circuit_breaker import CircuitBreaker, Rate, Ratio
 from .fallback import Fallback
 from .hedge import HedgePolicy
@@ -94,6 +94,8 @@ __all__ = [
     "Timeout",
     "TimeoutExceeded",
     "UsageTracker",
+    "cache_key",
+    "current_cache_key",
     "current_execution",
     "current_level",
     "current_user",
