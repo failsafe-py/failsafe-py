@@ -550,9 +550,16 @@ Implications:
 - **Docstrings are definition-of-done** for every public symbol, from the first commit. Google
   style. They are the whole input to the reference.
 - Port failsafe-go's doc comments where they apply — they are good, and they are the spec.
-- **`fail_on_warning: true` in `.readthedocs.yaml`**, so a renamed parameter fails the build
-  instead of rotting the published docs. That gate is what buys pkg.go.dev's always-current
-  property.
+- **The strict gate, verified rather than assumed.** `fail_on_warning: true` is a real MkDocs
+  key on Read the Docs and does mean `--strict`, but it applies only to RTD's *default* build
+  step. `.readthedocs.yaml` overrides that step to run under `uv`, so the gate lives in the
+  command — `mkdocs build --strict` — and `fail_on_warning` would be inert. Both were measured:
+  renaming a parameter without updating its docstring fails the build with
+  *"Parameter 'max_retries' does not appear in the function signature"*, exit 1; a reference to
+  a symbol that does not exist fails with *"could not be found"*. That is the pkg.go.dev
+  always-current property, and it is why the gate is never relaxed to make a build pass.
+- **Read the Docs installs with `uv` natively**, via `python.install` with `method: uv`,
+  `command: sync`, `groups: [docs]`. No `pip install uv` bootstrap, and the lockfile is honoured.
 
 
 ### D-17 — `AdaptiveLimiter` stays flat (settles the D-1 deferral)

@@ -26,3 +26,14 @@ jobs:
       - run: uv run --python ${{ matrix.python-version }} ruff format --check .
       - run: uv run --python ${{ matrix.python-version }} mypy
       - run: uv run --python ${{ matrix.python-version }} pytest
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --locked --group docs
+      # --strict, so a stale docstring fails here rather than on Read the Docs.
+      - run: uv run mkdocs build --strict
