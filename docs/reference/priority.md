@@ -2,6 +2,8 @@
 
 Request-scoped priority, so overload sheds the least valuable work.
 
+[Guide: Execution prioritization](https://failsafe-py.github.io/execution-prioritization){ .md-button }
+
 ::: failsafe.Priority
 
 ::: failsafe.priority_scope
