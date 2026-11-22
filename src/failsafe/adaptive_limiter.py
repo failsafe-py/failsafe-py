@@ -95,7 +95,7 @@ def queue_prioritizer(
     *,
     level_tracker: Any = None,
     usage_tracker: Any = None,
-    on_threshold_changed: Listener | Sequence[Listener] | None = None,
+    on_threshold_changed: Listener | None = None,
 ) -> Prioritizer:
     """Create a :class:`~failsafe._prioritizer.Prioritizer` driven by limiter queueing.
 
@@ -251,8 +251,8 @@ class AdaptiveLimiter:
         correlation_window_size: int = 50,
         queueing: tuple[float, float] | None = None,
         max_wait_time: float | timedelta | None = None,
-        on_limit_exceeded: Listener | Sequence[Listener] | None = None,
-        on_limit_changed: Listener | Sequence[Listener] | None = None,
+        on_limit_exceeded: Listener | None = None,
+        on_limit_changed: Listener | None = None,
         clock: Clock = SYSTEM_CLOCK,
         rng: random.Random | None = None,
     ) -> None:

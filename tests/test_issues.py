@@ -100,10 +100,9 @@ def test_concurrent_executions_do_not_share_retry_state() -> None:
 
 def test_a_breaker_shared_across_threads_opens_once() -> None:
     """Every caller must see one consistent state, not a torn one."""
-    breaker = CircuitBreaker(failure_threshold=3)
     transitions: list[str] = []
+    breaker = CircuitBreaker(failure_threshold=3, on_open=lambda e: transitions.append("open"))
     lock = threading.Lock()
-    breaker.on_open.add(lambda e: transitions.append("open"))
     start = threading.Barrier(16)
 
     def worker() -> None:

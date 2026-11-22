@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import random
-from collections.abc import Generator, Sequence
+from collections.abc import Generator
 from datetime import timedelta
 from typing import Any
 
@@ -95,12 +95,12 @@ class RetryPolicy:
         max_duration: float | timedelta | None = None,
         return_last_failure: bool = False,
         budget: Budget | None = None,
-        on_retry: Listener | Sequence[Listener] | None = None,
-        on_retry_scheduled: Listener | Sequence[Listener] | None = None,
-        on_retries_exceeded: Listener | Sequence[Listener] | None = None,
-        on_abort: Listener | Sequence[Listener] | None = None,
-        on_success: Listener | Sequence[Listener] | None = None,
-        on_failure: Listener | Sequence[Listener] | None = None,
+        on_retry: Listener | None = None,
+        on_retry_scheduled: Listener | None = None,
+        on_retries_exceeded: Listener | None = None,
+        on_abort: Listener | None = None,
+        on_success: Listener | None = None,
+        on_failure: Listener | None = None,
         rng: random.Random | None = None,
     ) -> None:
         if max_retries is not None and max_retries < 0:

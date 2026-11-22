@@ -92,7 +92,7 @@ def throttle_prioritizer(
     *,
     level_tracker: LevelTracker | None = None,
     usage_tracker: UsageTracker | None = None,
-    on_threshold_changed: Listener | Sequence[Listener] | None = None,
+    on_threshold_changed: Listener | None = None,
 ) -> Prioritizer:
     """Create a :class:`~failsafe._prioritizer.Prioritizer` driven by throttler failures.
 
@@ -173,8 +173,8 @@ class AdaptiveThrottler:
         thresholding_period: float | timedelta = 60.0,
         max_rejection_rate: float = 0.9,
         handle: Condition | None = None,
-        on_success: Listener | Sequence[Listener] | None = None,
-        on_failure: Listener | Sequence[Listener] | None = None,
+        on_success: Listener | None = None,
+        on_failure: Listener | None = None,
         clock: Clock = SYSTEM_CLOCK,
         rng: random.Random | None = None,
     ) -> None:

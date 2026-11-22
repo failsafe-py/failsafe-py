@@ -11,7 +11,7 @@ Mirrors Go's ``events.go``. Two deviations, both deliberate:
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, TypeAlias
 
@@ -109,46 +109,31 @@ Listener: TypeAlias = Callable[[Any], None]
 
 
 class Listeners:
-    """A registered set of listeners for one event, called in registration order.
+    """One optional listener for an event, configured when the policy is built.
 
-    Accepts a single callable or a sequence of them. Exceptions raised by a
-    listener are logged and swallowed: an execution's outcome never depends on whether
-    a metrics hook worked.
+    Exceptions raised by a listener are logged and swallowed: an execution's outcome
+    never depends on whether a metrics hook worked.
 
     Args:
-        listeners: The initially configured listener or listeners.
+        name: The event name, used in the log message when a listener raises.
+        listener: The configured listener, if any.
     """
 
-    __slots__ = ("_listeners", "_name")
+    __slots__ = ("_listener", "_name")
 
-    def __init__(self, name: str, listeners: Listener | Sequence[Listener] | None) -> None:
+    def __init__(self, name: str, listener: Listener | None) -> None:
         self._name = name
-        if listeners is None:
-            self._listeners: list[Listener] = []
-        elif callable(listeners):
-            self._listeners = [listeners]
-        else:
-            self._listeners = list(listeners)
-
-    def add(self, listener: Listener) -> Listener:
-        """Register ``listener`` and return it, so this doubles as a decorator.
-
-        Example:
-            >>> @retry.on_retry.add
-            ... def log_retry(event):
-            ...     log.warning("attempt %d failed", event.attempts)
-        """
-        self._listeners.append(listener)
-        return listener
+        self._listener = listener
 
     def __bool__(self) -> bool:
-        """Whether any listener is registered."""
-        return bool(self._listeners)
+        """Whether a listener is configured."""
+        return self._listener is not None
 
     def emit(self, event: Any) -> None:
-        """Call every listener with ``event``, logging and swallowing any exception."""
-        for listener in self._listeners:
-            try:
-                listener(event)
-            except Exception:
-                _log.exception("failsafe %s listener raised", self._name)
+        """Call the listener with ``event``, logging and swallowing any exception."""
+        if self._listener is None:
+            return
+        try:
+            self._listener(event)
+        except Exception:
+            _log.exception("failsafe %s listener raised", self._name)

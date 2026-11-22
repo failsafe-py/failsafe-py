@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Generator, Sequence
+from collections.abc import Callable, Generator
 from typing import Any, Protocol
 
 from ._conditions import Condition, FailureConditions
@@ -71,9 +71,9 @@ class CachePolicy:
         *,
         key: Callable[..., str | None],
         cache_if: Condition | None = None,
-        on_hit: Listener | Sequence[Listener] | None = None,
-        on_miss: Listener | Sequence[Listener] | None = None,
-        on_cached: Listener | Sequence[Listener] | None = None,
+        on_hit: Listener | None = None,
+        on_miss: Listener | None = None,
+        on_cached: Listener | None = None,
     ) -> None:
         self._cache = cache
         self._key = key

@@ -429,30 +429,6 @@ def test_exceeded_wins_over_abort_on_the_last_attempt(clock: FakeClock) -> None:
     assert log == ["abort"], "on_retries_exceeded is suppressed by an abort"
 
 
-def test_listeners_accept_a_sequence(clock: FakeClock) -> None:
-    log: list[str] = []
-    policy = RetryPolicy(
-        max_retries=1,
-        on_failure=[lambda e: log.append("a"), lambda e: log.append("b")],
-    )
-    assert Failsafe(policy, clock=clock).call(flaky(1)) == "ok"
-    assert log == ["a", "b"]
-
-
-def test_listener_registration_doubles_as_a_decorator(clock: FakeClock) -> None:
-    """policy.on_retry(fn) appends and returns fn."""
-    policy = RetryPolicy(max_retries=1)
-    log: list[int] = []
-
-    @policy.on_retry.add
-    def record(event: object) -> None:
-        log.append(1)
-
-    assert callable(record), "the decorator must return the function"
-    Failsafe(policy, clock=clock).call(flaky(1))
-    assert log == [1]
-
-
 def test_listener_exception_does_not_break_the_execution(clock: FakeClock) -> None:
     """PORT.md item 5: a metrics bug must not break a request."""
 

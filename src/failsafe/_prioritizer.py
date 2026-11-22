@@ -100,7 +100,7 @@ class Prioritizer:
         *,
         level_tracker: LevelTracker | None = None,
         usage_tracker: UsageTracker | None = None,
-        on_threshold_changed: Listener | Sequence[Listener] | None = None,
+        on_threshold_changed: Listener | None = None,
     ) -> None:
         self._strategy = strategy
         self._level_tracker = level_tracker if level_tracker is not None else LevelTracker()

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import threading
-from collections.abc import Callable, Generator, Sequence
+from collections.abc import Callable, Generator
 from datetime import timedelta
 from typing import Any
 
@@ -95,7 +95,7 @@ class HedgePolicy:
         max_hedges: int = 1,
         cancel_on: Condition | None = None,
         budget: Budget | None = None,
-        on_hedge: Listener | Sequence[Listener] | None = None,
+        on_hedge: Listener | None = None,
     ) -> None:
         if (delay is None) == (quantile is None):
             raise ValueError("exactly one of delay or quantile is required")

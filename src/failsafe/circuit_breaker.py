@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import random
 import threading
-from collections.abc import Generator, Sequence
+from collections.abc import Generator
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
@@ -161,12 +161,12 @@ class CircuitBreaker:
         delay: Delay | None = 60.0,
         handle: Condition | None = None,
         clock: Clock = SYSTEM_CLOCK,
-        on_open: Listener | Sequence[Listener] | None = None,
-        on_half_open: Listener | Sequence[Listener] | None = None,
-        on_close: Listener | Sequence[Listener] | None = None,
-        on_state_change: Listener | Sequence[Listener] | None = None,
-        on_success: Listener | Sequence[Listener] | None = None,
-        on_failure: Listener | Sequence[Listener] | None = None,
+        on_open: Listener | None = None,
+        on_half_open: Listener | None = None,
+        on_close: Listener | None = None,
+        on_state_change: Listener | None = None,
+        on_success: Listener | None = None,
+        on_failure: Listener | None = None,
         rng: random.Random | None = None,
     ) -> None:
         self._lock = threading.Lock()

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import threading
-from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -74,7 +73,7 @@ class Budget:
         *,
         max_rate: float = 0.2,
         min_concurrency: int = 3,
-        on_exceeded: Listener | Sequence[Listener] | None = None,
+        on_exceeded: Listener | None = None,
     ) -> None:
         if not 0 < max_rate <= 1:
             raise ValueError("max_rate must be greater than 0 and at most 1")

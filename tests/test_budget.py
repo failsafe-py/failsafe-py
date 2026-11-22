@@ -97,10 +97,9 @@ def test_retry_proceeds_while_the_budget_allows_it() -> None:
 
 def test_retry_stops_when_the_budget_is_exceeded() -> None:
     """Go TestBudget/when retries exceeded: the retry is refused, not merely delayed."""
-    budget = Budget(max_rate=0.5, min_concurrency=1)
-    saturate(budget, executions=2, extra=2)
     events: list[BudgetExceededEvent] = []
-    budget.on_exceeded.add(events.append)
+    budget = Budget(max_rate=0.5, min_concurrency=1, on_exceeded=events.append)
+    saturate(budget, executions=2, extra=2)
     calls: list[int] = []
 
     def always_fails() -> str:
@@ -164,10 +163,9 @@ def test_hedging_stops_when_the_budget_is_exceeded() -> None:
     The initial attempt is never budgeted, so it still produces a result; only the
     hedge is refused.
     """
-    budget = Budget(max_rate=0.5, min_concurrency=1)
-    saturate(budget, executions=2, extra=2)
     events: list[BudgetExceededEvent] = []
-    budget.on_exceeded.add(events.append)
+    budget = Budget(max_rate=0.5, min_concurrency=1, on_exceeded=events.append)
+    saturate(budget, executions=2, extra=2)
     started: list[int] = []
 
     async def slow() -> str:

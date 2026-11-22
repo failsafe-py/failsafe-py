@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import threading
 from abc import ABC, abstractmethod
-from collections.abc import Generator, Sequence
+from collections.abc import Generator
 from datetime import timedelta
 from typing import Any
 
@@ -164,7 +164,7 @@ class RateLimiter:
         self,
         stats: _Stats,
         max_wait_time: float | timedelta | None,
-        on_rate_limit_exceeded: Listener | Sequence[Listener] | None,
+        on_rate_limit_exceeded: Listener | None,
         clock: Clock,
     ) -> None:
         self._stats = stats
@@ -182,7 +182,7 @@ class RateLimiter:
         *,
         max_rate: float | timedelta | None = None,
         max_wait_time: float | timedelta | None = None,
-        on_rate_limit_exceeded: Listener | Sequence[Listener] | None = None,
+        on_rate_limit_exceeded: Listener | None = None,
         clock: Clock = SYSTEM_CLOCK,
     ) -> RateLimiter:
         """Build a limiter that spreads executions evenly over time.
@@ -231,7 +231,7 @@ class RateLimiter:
         period: float | timedelta = 1.0,
         *,
         max_wait_time: float | timedelta | None = None,
-        on_rate_limit_exceeded: Listener | Sequence[Listener] | None = None,
+        on_rate_limit_exceeded: Listener | None = None,
         clock: Clock = SYSTEM_CLOCK,
     ) -> RateLimiter:
         """Build a limiter that permits bursts of executions within each period.

@@ -399,8 +399,8 @@ own semantics. This deletes an entire interface and 4 of Go's 8 execute methods.
 
 ### D-10 — Event listeners
 
-Constructor kwargs accepting `Callable | Sequence[Callable]`, plus `policy.on_retry(fn)` which
-appends and returns `fn` so it doubles as a decorator.
+A single optional listener per event, passed as a constructor keyword. There is no
+post-construction registration: a policy's observers are visible where it is built.
 
 Two deviations from Go:
 

@@ -426,8 +426,9 @@ def test_state_change_listeners_fire_in_order(clock: FakeClock) -> None:
 def test_listener_may_reenter_the_breaker(clock: FakeClock) -> None:
     """Go releases the lock before firing listeners, so they may call back in."""
     seen: list[str] = []
-    breaker = CircuitBreaker(failure_threshold=1, clock=clock)
-    breaker.on_open.add(lambda e: seen.append(breaker.state))
+    breaker = CircuitBreaker(
+        failure_threshold=1, clock=clock, on_open=lambda e: seen.append(breaker.state)
+    )
     breaker.record_failure()
     assert seen == ["open"], "the state change is already visible to the listener"
 

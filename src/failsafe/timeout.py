@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Generator, Sequence
+from collections.abc import Generator
 from datetime import timedelta
 from typing import Any
 
@@ -51,7 +51,7 @@ class Timeout:
         timeout: float | timedelta,
         *,
         interrupt: bool = False,
-        on_timeout: Listener | Sequence[Listener] | None = None,
+        on_timeout: Listener | None = None,
     ) -> None:
         limit = seconds(timeout)
         if limit <= 0:

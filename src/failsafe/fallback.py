@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Generator, Sequence
+from collections.abc import Callable, Generator
 from typing import Any
 
 from ._conditions import Condition, FailureConditions
@@ -49,9 +49,9 @@ class Fallback:
         value: Any = _UNSET,
         fn: Callable[[Execution], Any] | None = None,
         handle: Condition | None = None,
-        on_fallback: Listener | Sequence[Listener] | None = None,
-        on_success: Listener | Sequence[Listener] | None = None,
-        on_failure: Listener | Sequence[Listener] | None = None,
+        on_fallback: Listener | None = None,
+        on_success: Listener | None = None,
+        on_failure: Listener | None = None,
     ) -> None:
         if (value is _UNSET) == (fn is None):
             raise ValueError("Fallback takes exactly one of value= or fn=")

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Generator, Sequence
+from collections.abc import Generator
 from datetime import timedelta
 from typing import Any
 
@@ -53,7 +53,7 @@ class Bulkhead:
         max_concurrency: int,
         *,
         max_wait_time: float | timedelta = 0.0,
-        on_full: Listener | Sequence[Listener] | None = None,
+        on_full: Listener | None = None,
     ) -> None:
         if max_concurrency <= 0:
             raise ValueError("max_concurrency must be positive")
