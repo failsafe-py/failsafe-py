@@ -60,7 +60,7 @@ markdown_extensions:
 
 nav:
   - Overview: index.md
-  - Executors: reference/executors.md
+  - Entry points: reference/entry-points.md
   - Policies:
       - Retry: reference/retry.md
       - Circuit breaker: reference/circuit-breaker.md

@@ -3,8 +3,8 @@
 Generated from the docstrings in `failsafe`, a port of
 [failsafe-go](https://github.com/failsafe-go/failsafe-go).
 
-This site is the reference. The prose guide — concepts, usage, comparisons — lives
-separately.
+This site is the reference. The prose guide — concepts, usage, comparisons — lives at
+[failsafe-py.github.io](https://failsafe-py.github.io).
 
 ## Shape of the library
 
@@ -27,6 +27,6 @@ that makes them work.
 
 | | |
 |---|---|
-| [Executors](reference/executors.md) | `Failsafe`, `AsyncFailsafe`, and the execution in progress |
+| [Entry points](reference/entry-points.md) | `Failsafe`, `AsyncFailsafe`, and the execution in progress |
 | [Policies](reference/retry.md) | retry, circuit breaker, timeout, fallback, bulkhead, rate limiter, hedge, cache, budget, adaptive throttler and limiter |
 | [Vocabulary](reference/conditions.md) | conditions, delays, priority, events, exceptions |
