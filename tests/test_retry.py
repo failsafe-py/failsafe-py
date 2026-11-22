@@ -251,6 +251,20 @@ def test_handle_matches_an_exception_group_leaf(clock: FakeClock) -> None:
         Failsafe(policy, clock=clock).call(fn)
 
 
+def test_a_bare_value_condition_is_rejected_with_a_pointer_to_result() -> None:
+    """Iterating a str yields str, so compiling one recursed until the stack blew.
+
+    A str satisfies the condition type while an int does not, which is why the string
+    case reached the compiler and crashed instead of being rejected outright.
+    """
+    with pytest.raises(TypeError, match=r"Result\('bad'\)"):
+        RetryPolicy(handle="bad")
+    with pytest.raises(TypeError, match=r"Result\(b'bad'\)"):
+        RetryPolicy(handle=b"bad")
+    with pytest.raises(TypeError, match=r"Result\(429\)"):
+        RetryPolicy(handle=429)  # type: ignore[arg-type]
+
+
 def test_handle_result_retries_a_value(clock: FakeClock) -> None:
     """Go HandleResult: a returned value counts as a failure."""
     results = iter(["bad", "bad", "good"])

@@ -91,6 +91,12 @@ def _as_predicate(condition: Any) -> tuple[Predicate, bool]:
     if callable(condition):
         predicate: Predicate = condition
         return predicate, True
+    if isinstance(condition, (str, bytes)):
+        # Iterating a str yields str, so the branch below would recurse forever.
+        raise TypeError(
+            f"invalid condition {condition!r}: to match a returned value, wrap it as "
+            f"Result({condition!r})"
+        )
     if isinstance(condition, Sequence):
         compiled = [_as_predicate(item) for item in condition]
         predicates = [p for p, _ in compiled]
@@ -101,7 +107,8 @@ def _as_predicate(condition: Any) -> tuple[Predicate, bool]:
         )
     raise TypeError(
         f"invalid condition {condition!r}: expected an exception type, a tuple of them, "
-        "Result(value), a callable, or a sequence of those"
+        f"Result({condition!r}) to match it as a returned value, a callable, or a "
+        "sequence of those"
     )
 
 
