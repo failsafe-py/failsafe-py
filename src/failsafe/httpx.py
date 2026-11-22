@@ -41,12 +41,11 @@ __all__ = [
     "retry_policy",
 ]
 
-RETRYABLE_STATUS_CODES = frozenset({408, 429})
+RETRYABLE_STATUS_CODES = frozenset({429})
 """Non-5xx statuses worth retrying.
 
-``408 Request Timeout`` is the server reporting it gave up waiting for the request,
-and ``429 Too Many Requests`` invites a later attempt. Go retries only the 429; see
-PORT.md item 18 for why 408 is included here.
+``429 Too Many Requests`` invites a later attempt, and is the only non-5xx status Go
+retries.
 """
 
 _NOT_RETRYABLE_SERVER_ERRORS = frozenset({501})
@@ -60,11 +59,11 @@ def is_retryable(response: httpx.Response | None, exc: Exception | None) -> bool
     """Whether a round trip is worth retrying, as Go's ``NewRetryPolicyBuilder`` judges.
 
     Retryable: any `httpx.TransportError` (connection failures, timeouts, read
-    errors), plus responses with status 408, 429, or 5xx other than 501.
+    errors), plus responses with status 429 or 5xx other than 501.
 
-    Not retryable: a response the server answered deliberately (4xx other than 408 and
-    429), an unsupported scheme, an invalid URL, or too many redirects — none of which
-    a second identical request would fix.
+    Not retryable: a response the server answered deliberately (4xx other than 429),
+    an unsupported scheme, an invalid URL, or too many redirects — none of which a
+    second identical request would fix.
 
     Args:
         response: The response, if one arrived.

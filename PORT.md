@@ -67,10 +67,10 @@ start at the documentation site.
     Go needs `NewSmooth`, `NewSmoothWithMaxRate`, `NewBursty` and a builder for each; two
     classmethods with keyword arguments cover all of it. `smooth()` takes either
     `max_executions` with a `period` or a `max_rate`, and rejects both or neither.
-18. **`408 Request Timeout` is retryable; Go retries only 429 and 5xx-except-501.** A 408 is
-    the server saying it gave up waiting for the request, which is exactly the transient
-    condition a retry addresses. Go's omission looks like an oversight rather than a decision:
-    its own `Retry-After` handling covers 429 and 503 only.
+18. **The retryable status set matches Go exactly: 429 and 5xx except 501.** An earlier
+    draft also retried `408 Request Timeout`, reasoning that it is the transient condition
+    a retry addresses. That was reverted: a client-side deviation in which statuses get
+    retried is a surprise, not a feature.
 19. **A policy rejection surfaces as `httpx.TransportError`.** Go returns its own error from
     the `RoundTripper`, but httpx callers catch `httpx.HTTPError`, and a bare `FailsafeError`
     escaping a transport would bypass every `except httpx.HTTPError` in existing code. The

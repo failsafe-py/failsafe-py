@@ -441,7 +441,7 @@ retry = failsafe.httpx.retry_policy(max_retries=3, delay=Backoff(1, 30))
 
 Non-obvious behaviours to port from `failsafehttp`:
 
-- default retryable set: connection errors, 408/429/5xx, honouring `Retry-After`
+- default retryable set: connection errors, 429/5xx-except-501, honouring `Retry-After`
   (`failsafe.httpx.retry_after_delay`, usable in a `CircuitBreaker` too, as Go's `DelayFunc` is);
 - **request body rewind between attempts** (Go's `bodyReader`) — without it a retry silently sends
   an empty body. A correctness item, not an optimisation;
