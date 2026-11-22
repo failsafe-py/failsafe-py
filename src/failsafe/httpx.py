@@ -55,7 +55,7 @@ _RETRY_AFTER_STATUS_CODES = frozenset({429, 503})
 def is_retryable(response: httpx.Response | None, exc: Exception | None) -> bool:
     """Whether a round trip is worth retrying, as Go's ``NewRetryPolicyBuilder`` judges.
 
-    Retryable: any :exc:`httpx.TransportError` (connection failures, timeouts, read
+    Retryable: any `httpx.TransportError` (connection failures, timeouts, read
     errors), plus responses with status 408, 429, or 5xx other than 501.
 
     Not retryable: a response the server answered deliberately (4xx other than 408 and
@@ -85,7 +85,8 @@ def retry_after_delay(ex: Execution | None) -> float:
     """Delay according to a response's ``Retry-After`` header.
 
     Usable anywhere a callable delay is accepted, in a
-    :class:`~failsafe.RetryPolicy` or a :class:`~failsafe.CircuitBreaker`, mirroring
+    [`RetryPolicy`][failsafe.RetryPolicy] or a [`CircuitBreaker`][failsafe.CircuitBreaker],
+        mirroring
     Go's ``DelayFunc``::
 
         CircuitBreaker(handle=429, delay=retry_after_delay)
@@ -125,21 +126,21 @@ def retry_after_delay(ex: Execution | None) -> float:
 
 
 def retry_policy(**kwargs: Any) -> RetryPolicy:
-    """Build a :class:`~failsafe.RetryPolicy` that knows which HTTP failures to retry.
+    """Build a [`RetryPolicy`][failsafe.RetryPolicy] that knows which HTTP failures to retry.
 
-    Defaults to :func:`is_retryable` for ``handle`` and :func:`retry_after_delay` for
+    Defaults to `is_retryable` for ``handle`` and `retry_after_delay` for
     ``delay``; both are overridable, as are all other
-    :class:`~failsafe.RetryPolicy` arguments::
+    [`RetryPolicy`][failsafe.RetryPolicy] arguments::
 
         retry_policy(max_retries=3, delay=Backoff(1.0, 30.0))
 
     ``return_last_failure`` defaults to ``True``, so exhausting the retries on a
     failing *response* yields that response rather than
-    :exc:`~failsafe.RetriesExceeded`: a 500 is still an answer the caller may want to
+    [`RetriesExceeded`][failsafe.RetriesExceeded]: a 500 is still an answer the caller may want to
     inspect, and Go returns it too.
 
     Args:
-        **kwargs: Passed to :class:`~failsafe.RetryPolicy`.
+        **kwargs: Passed to [`RetryPolicy`][failsafe.RetryPolicy].
 
     Returns:
         A retry policy suited to HTTP.
@@ -153,7 +154,7 @@ def retry_policy(**kwargs: Any) -> RetryPolicy:
 def _buffer_body(request: httpx.Request) -> None:
     """Make a streaming request body replayable, so a retry resends it.
 
-    ``Request.read()`` drains the stream and swaps in a :class:`httpx.ByteStream` over
+    ``Request.read()`` drains the stream and swaps in a `httpx.ByteStream` over
     the buffered bytes, which every later attempt replays. Without this a retry sends
     an empty body: the first attempt consumed the iterator.
     """
@@ -162,10 +163,10 @@ def _buffer_body(request: httpx.Request) -> None:
 
 
 class FailsafeTransport(httpx.BaseTransport):
-    """An :class:`httpx.BaseTransport` that applies policies to each round trip.
+    """An `httpx.BaseTransport` that applies policies to each round trip.
 
     Policies are composed outermost-first, exactly as in
-    :class:`~failsafe.Failsafe`::
+    [`Failsafe`][failsafe.Failsafe]::
 
         transport = FailsafeTransport(retry_policy(), breaker)
         client = httpx.Client(transport=transport)
@@ -174,18 +175,17 @@ class FailsafeTransport(httpx.BaseTransport):
     whose body httpx already holds in memory is left alone.
 
     Policy rejections that never reached the network (an open breaker, a full
-    bulkhead) surface as :exc:`httpx.TransportError`, so callers catch one family.
+    bulkhead) surface as `httpx.TransportError`, so callers catch one family.
 
     Responses are returned with their stream intact, so
-    :meth:`httpx.Client.stream` works through the transport. Note that policies judge
+    `httpx.Client.stream` works through the transport. Note that policies judge
     the *response headers*: a stream that fails midway has already been judged a
     success, matching Go, where the policy result is recorded before the body is read.
 
     Args:
         *policies: The policies to apply, outermost first.
-        transport: The transport to wrap. Defaults to :class:`httpx.HTTPTransport`.
-        clock: The time source policies delay against. Injectable so tests need not
-            sleep.
+        transport: The transport to wrap. Defaults to `httpx.HTTPTransport`.
+        clock: Custom time source policies delay against (e.g. for testing).
     """
 
     def __init__(
@@ -217,16 +217,15 @@ class FailsafeTransport(httpx.BaseTransport):
 
 
 class AsyncFailsafeTransport(httpx.AsyncBaseTransport):
-    """The async counterpart of :class:`FailsafeTransport`.
+    """The async counterpart of `FailsafeTransport`.
 
-    Shares policy state with any :class:`FailsafeTransport` built from the same policy
+    Shares policy state with any `FailsafeTransport` built from the same policy
     objects, so one circuit breaker can guard both.
 
     Args:
         *policies: The policies to apply, outermost first.
-        transport: The transport to wrap. Defaults to :class:`httpx.AsyncHTTPTransport`.
-        clock: The time source policies delay against. Injectable so tests need not
-            sleep.
+        transport: The transport to wrap. Defaults to `httpx.AsyncHTTPTransport`.
+        clock: Custom time source policies delay against (e.g. for testing).
     """
 
     def __init__(
@@ -258,7 +257,7 @@ class AsyncFailsafeTransport(httpx.AsyncBaseTransport):
 
 
 async def _abuffer_body(request: httpx.Request) -> None:
-    """The async counterpart of :func:`_buffer_body`."""
+    """The async counterpart of `_buffer_body`."""
     if not isinstance(request.stream, httpx.ByteStream):
         await request.aread()
 
@@ -267,6 +266,6 @@ def _as_http_error(exc: FailsafeError, request: httpx.Request) -> Exception:
     """Surface a policy rejection as an httpx error, so client code catches one family.
 
     A policy that never ran the request (an open breaker, a full bulkhead) has no
-    response to return, and httpx callers expect :exc:`httpx.HTTPError`.
+    response to return, and httpx callers expect `httpx.HTTPError`.
     """
     return httpx.TransportError(str(exc), request=request)

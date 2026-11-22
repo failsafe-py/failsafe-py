@@ -1,6 +1,6 @@
 """Rolling statistical windows, ported from failsafe-go's ``internal/util``.
 
-These back the :class:`~failsafe.AdaptiveLimiter`'s view of execution-time trends.
+These back the [`AdaptiveLimiter`][failsafe.AdaptiveLimiter]'s view of execution-time trends.
 None are concurrency safe; the owning policy holds its lock.
 """
 
@@ -123,7 +123,7 @@ class MovingQuantile:
     standard deviation, so it tracks a shifting distribution rather than averaging
     over all history.
 
-    Distinct from :class:`QuantileWindow`, which keeps its samples and is exact.
+    Distinct from `QuantileWindow`, which keeps its samples and is exact.
     This one is for the hedge policy, where samples arrive without bound and only
     the current estimate matters.
 

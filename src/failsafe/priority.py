@@ -1,13 +1,13 @@
 """Execution prioritization, ported from failsafe-go's ``priority`` package.
 
 During overload a prioritized policy sheds load from the bottom up: each execution
-carries a *level*, and the :class:`Prioritizer` computes the level below which
+carries a *level*, and the [`Prioritizer`][failsafe.Prioritizer] computes the level below which
 executions are rejected. Levels run from ``0`` to ``499``, with each
-:class:`Priority` owning a hundred of them, so a subset of a priority can be shed
+[`Priority`][failsafe.Priority] owning a hundred of them, so a subset of a priority can be shed
 rather than the whole class at once.
 
 Priority is ambient rather than a parameter: it is request-scoped data
-that propagates across hops, so it lives in a :class:`~contextvars.ContextVar` and is
+that propagates across hops, so it lives in a `ContextVar` and is
 read by whichever policy happens to run::
 
     with priority_scope(Priority.HIGH):
@@ -48,7 +48,7 @@ _MAX_LEVEL_OFFSET = 99.0
 
 
 class Priority(enum.IntEnum):
-    """An execution priority, from :attr:`VERY_LOW` to :attr:`VERY_HIGH`.
+    """An execution priority, from `VERY_LOW` to `VERY_HIGH`.
 
     Each priority spans a hundred levels. Rejections are made by level, so load within
     a single priority sheds gradually instead of all at once.
@@ -78,7 +78,7 @@ class Priority(enum.IntEnum):
         together.
 
         Args:
-            rng: The source of randomness. Injectable so tests are deterministic.
+            rng: Custom source of randomness (e.g. for testing).
 
         Returns:
             A level within this priority.
@@ -129,8 +129,8 @@ def level_scope(level: int) -> Iterator[None]:
 def user_scope(user_id: str) -> Iterator[None]:
     """Attribute the enclosed block's usage to ``user_id``.
 
-    Only meaningful with a :class:`UsageTracker`, which uses the attribution to give
-    light users a better level than heavy ones.
+    Only meaningful with a [`UsageTracker`][failsafe.UsageTracker], which uses the
+    attribution to give light users a better level than heavy ones.
 
     Args:
         user_id: The user to attribute usage to.
@@ -143,15 +143,16 @@ def user_scope(user_id: str) -> Iterator[None]:
 
 
 def current_priority() -> Priority | None:
-    """Return the :class:`Priority` in scope, or ``None``."""
+    """Return the [`Priority`][failsafe.Priority] in scope, or ``None``."""
     return _PRIORITY.get(None)
 
 
 def current_level(rng: random.Random | None = None) -> int | None:
     """Return the level in scope.
 
-    An exact level set by :func:`level_scope` wins; otherwise a random level within the
-    :class:`Priority` in scope is returned, or ``None`` if neither is set.
+    An exact level set by [`level_scope`][failsafe.level_scope] wins; otherwise a random
+    level within the
+    [`Priority`][failsafe.Priority] in scope is returned, or ``None`` if neither is set.
 
     Args:
         rng: The source of randomness for priority-derived levels.
@@ -176,8 +177,8 @@ def current_user() -> str | None:
 class LevelTracker:
     """Tracks the levels of recently accepted executions.
 
-    A :class:`Prioritizer` asks this for the level at a given quantile: to reject 30% of
-    load it needs the level that 30% of recent executions fall below.
+    A [`Prioritizer`][failsafe.Prioritizer] asks this for the level at a given quantile:
+    to reject 30% of load it needs the level that 30% of recent executions fall below.
 
     Args:
         window_size: How many recent levels to retain.
@@ -250,15 +251,15 @@ class UsageTracker:
     heavy user can crowd out many light ones. With it, a user's level within their
     priority falls as their usage rises relative to everyone else's.
 
-    Usage is attributed via :func:`user_scope` and totals are only re-ranked by
-    :meth:`calibrate`.
+    Usage is attributed via [`user_scope`][failsafe.user_scope] and totals are only re-ranked by
+    `calibrate`.
 
     Args:
         window: The span in seconds over which usage counts. Users idle for twice this
             long are forgotten. Defaults to five minutes.
         max_users: The most users to track at once; the least recently active is
             evicted beyond that.
-        clock: The time source. Injectable so tests need not sleep.
+        clock: Custom time source for usage windows (e.g. for testing).
 
     Raises:
         ValueError: If the window or user limit is not positive.

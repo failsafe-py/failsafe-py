@@ -48,14 +48,15 @@ class Budget:
     window, so it needs no clock and reacts immediately. Below ``min_concurrency``
     extra attempts are always allowed, so a quiet service still retries.
 
-    When the budget is spent, a :class:`~failsafe.RetryPolicy` stops with
-    :exc:`~failsafe.BudgetExceeded` and a :class:`~failsafe.HedgePolicy` simply
+    When the budget is spent, a [`RetryPolicy`][failsafe.RetryPolicy] stops with
+    [`BudgetExceeded`][failsafe.BudgetExceeded] and a [`HedgePolicy`][failsafe.HedgePolicy] simply
     stops hedging, leaving the attempts already running to produce a result.
 
     Args:
         max_rate: The share of in-flight executions that may be retries or hedges.
         min_concurrency: How many extra attempts are allowed regardless of the rate.
-        on_exceeded: Called with a :class:`BudgetExceededEvent` when an attempt is
+        on_exceeded: Called with a [`BudgetExceededEvent`][failsafe.BudgetExceededEvent] when an
+            attempt is
             refused.
 
     Raises:
@@ -101,7 +102,7 @@ class Budget:
         return self._extra / self._executions
 
     def record_execution(self) -> None:
-        """Count an execution as in flight. Pair with :meth:`release_execution`."""
+        """Count an execution as in flight. Pair with `release_execution`."""
         with self._lock:
             self._executions += 1
 
@@ -115,7 +116,7 @@ class Budget:
 
         A granted permit counts as an extra attempt *and* as an execution, so a
         retry-heavy period raises its own denominator rather than only its numerator.
-        Release it with :meth:`release_permit`.
+        Release it with `release_permit`.
         """
         with self._lock:
             if self._extra >= self.min_concurrency and self._rate() > self.max_rate:
@@ -125,13 +126,13 @@ class Budget:
             return True
 
     def release_permit(self) -> None:
-        """Release a permit granted by :meth:`try_acquire_permit`."""
+        """Release a permit granted by `try_acquire_permit`."""
         with self._lock:
             self._extra -= 1
             self._executions -= 1
 
     def notify_exceeded(self, ex: Execution, kind: str) -> None:
-        """Emit :attr:`on_exceeded` for an attempt the budget refused."""
+        """Emit `on_exceeded` for an attempt the budget refused."""
         if self.on_exceeded:
             self.on_exceeded.emit(BudgetExceededEvent(ex, kind, self.rate))
 

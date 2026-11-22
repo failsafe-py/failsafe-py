@@ -23,8 +23,8 @@ class Timeout:
         Failsafe(Timeout(10.0), retry)   # 10s for everything
         Failsafe(retry, Timeout(10.0))   # 10s per attempt
 
-    :exc:`~failsafe.TimeoutExceeded` is an ordinary failure, so an outer
-    :class:`~failsafe.RetryPolicy` can retry it. An :exc:`asyncio.CancelledError`
+    [`TimeoutExceeded`][failsafe.TimeoutExceeded] is an ordinary failure, so an outer
+    [`RetryPolicy`][failsafe.RetryPolicy] can retry it. An `asyncio.CancelledError`
     cannot: that is terminal.
 
     **Sync mode is cooperative by default.** Python cannot interrupt a running call, so
@@ -32,7 +32,7 @@ class Timeout:
     under a one-second timeout still blocks for a minute. ``interrupt=True`` runs the
     attempt on a worker thread and frees the caller on time, at the cost of leaving
     that thread running to completion. Async mode always interrupts, via
-    :func:`asyncio.timeout`.
+    `asyncio.timeout`.
 
     Args:
         timeout: The limit, in seconds or as a timedelta.

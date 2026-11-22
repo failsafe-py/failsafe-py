@@ -115,7 +115,7 @@ class FifoSemaphore:
     def await_released(self, timeout: float = 5.0) -> bool:
         """Block until every permit is free, or ``timeout`` elapses.
 
-        The companion to :meth:`await_waiters` for tests that must observe a permit
+        The companion to `await_waiters` for tests that must observe a permit
         coming back from a thread they cannot join, such as an attempt abandoned by
         an interrupting timeout.
 

@@ -32,20 +32,20 @@ P = ParamSpec("P")
 class AsyncFailsafe:
     """Executes coroutine functions under a composition of policies.
 
-    The async counterpart of :class:`~failsafe.Failsafe`, with the same composition
+    The async counterpart of [`Failsafe`][failsafe.Failsafe], with the same composition
     order and the same policy objects. Policy state is shared between the two: a
     circuit breaker tripped by a sync call is seen open by an async one.
 
-    Cancellation is ordinary :mod:`asyncio` cancellation. :exc:`asyncio.CancelledError`
-    is a :class:`BaseException` and is never treated as a failure or retried.
+    Cancellation is ordinary `asyncio` cancellation. `asyncio.CancelledError`
+    is a `BaseException` and is never treated as a failure or retried.
 
-    The result type is inferred from the function passed to :meth:`call`.
+    The result type is inferred from the function passed to `call`.
 
     This type is concurrency safe.
 
     Args:
         *policies: Policies, outermost first.
-        clock: The time source for delays and deadlines.
+        clock: Custom time source for delays and deadlines (e.g. for testing).
     """
 
     __slots__ = ("_chain", "_clock", "policies")
@@ -259,7 +259,7 @@ class AsyncFailsafe:
     ) -> Outcome[Any] | None:
         """Run an inner step under a deadline, returning ``None`` if it elapsed.
 
-        :func:`asyncio.timeout` is the mechanism, not something to reimplement: it
+        `asyncio.timeout` is the mechanism, not something to reimplement: it
         interrupts whatever is awaiting inside the scope and exposes the absolute
         deadline, which user code reads through ``Execution.remaining()``.
         """

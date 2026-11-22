@@ -19,11 +19,11 @@ class Bulkhead:
     """Limits how many executions may run at once, to bound load on a resource.
 
     An execution that finds every permit taken waits up to ``max_wait_time`` and then
-    fails with :exc:`~failsafe.BulkheadFull`. The default wait of zero rejects it
+    fails with [`BulkheadFull`][failsafe.BulkheadFull]. The default wait of zero rejects it
     immediately.
 
     The permit is held for a single *attempt* and released when that attempt finishes,
-    so a :class:`~failsafe.RetryPolicy` composed outside a bulkhead re-acquires for
+    so a [`RetryPolicy`][failsafe.RetryPolicy] composed outside a bulkhead re-acquires for
     each retry rather than holding a permit across the delay between them.
 
     A single instance serves both sync and async callers with one permit count, and
@@ -35,7 +35,7 @@ class Bulkhead:
     Args:
         max_concurrency: How many executions may run at once.
         max_wait_time: How long an execution waits for a permit before being rejected.
-            Accepts seconds or a :class:`~datetime.timedelta`. Defaults to no wait.
+            Accepts seconds or a `timedelta`. Defaults to no wait.
         on_full: Called when an execution is rejected because no permit was free.
 
     Raises:
@@ -107,7 +107,7 @@ class Bulkhead:
         """Acquire a permit only if one is free right now.
 
         Returns:
-            Whether a permit was acquired. Release it with :meth:`release_permit`.
+            Whether a permit was acquired. Release it with `release_permit`.
         """
         return self._semaphore.acquire(timeout=0)
 
@@ -117,7 +117,7 @@ class Bulkhead:
         Args:
             timeout: Seconds to wait, or ``None`` to wait indefinitely. Note that the
                 policy's ``max_wait_time`` applies to executions run through a
-                :class:`~failsafe.Failsafe`, not to this method.
+                [`Failsafe`][failsafe.Failsafe], not to this method.
 
         Raises:
             BulkheadFull: If no permit became available within ``timeout``.

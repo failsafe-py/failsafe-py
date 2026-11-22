@@ -15,7 +15,7 @@ __all__ = ["Cache", "CachePolicy"]
 class Cache(Protocol):
     """The two operations a cache backend must provide.
 
-    Structural, so a :class:`dict` subclass, an LRU, or a Redis wrapper all satisfy it
+    Structural, so a `dict` subclass, an LRU, or a Redis wrapper all satisfy it
     without importing anything from this library. Implementations are responsible for
     their own eviction, expiry and thread safety.
     """
@@ -36,7 +36,7 @@ class CachePolicy:
     """Serves results from a cache, skipping the execution entirely on a hit.
 
     The key is a function of the call arguments, shaped like
-    :func:`functools.lru_cache`::
+    `functools.lru_cache`::
 
         cache = CachePolicy(backend, key=lambda user_id: f"user:{user_id}")
         users = Failsafe(cache)
@@ -49,7 +49,7 @@ class CachePolicy:
     it to every later caller. ``cache_if`` narrows that further.
 
     Args:
-        cache: The backend, satisfying :class:`Cache`.
+        cache: The backend, satisfying [`Cache`][failsafe.Cache].
         key: Called with the execution's arguments, returning the cache key, or
             ``None`` to skip the cache for this call.
         cache_if: Which outcomes to cache. Defaults to any outcome that did not raise.

@@ -88,7 +88,8 @@ class CircuitBreaker:
     """Blocks executions against a resource that is failing, letting it recover.
 
     The breaker is **closed** while the resource is healthy. Enough failures **open**
-    it, and every execution is then rejected with :exc:`~failsafe.CircuitBreakerOpen`
+    it, and every execution is then rejected with
+        [`CircuitBreakerOpen`][failsafe.CircuitBreakerOpen]
     without the function being called. After ``delay`` the breaker becomes
     **half-open**, admitting a bounded number of trial executions: enough successes
     close it, and a failure opens it again.
@@ -109,22 +110,22 @@ class CircuitBreaker:
 
     Args:
         failure_threshold: What opens the breaker. An ``int`` means that many
-            consecutive failures; a :class:`Ratio` means that many out of the last N;
-            a :class:`Rate` means that failing proportion over a period.
+            consecutive failures; a [`Ratio`][failsafe.Ratio] means that many out of the last N;
+            a [`Rate`][failsafe.Rate] means that failing proportion over a period.
         success_threshold: How many trial executions must succeed to close the breaker
-            again, as an ``int`` or :class:`Ratio`. Defaults to the failure threshold,
+            again, as an ``int`` or [`Ratio`][failsafe.Ratio]. Defaults to the failure threshold,
             matching Go.
         delay: How long to stay open before admitting trials. Accepts the same forms as
             a retry delay, including a callable over the execution.
         handle: What counts as a failure. Defaults to any exception.
-        clock: The time source, shared with the time-based window.
+        clock: Custom time source, shared with the time-based window (e.g. for testing).
         on_open: Called when the breaker opens.
         on_half_open: Called when the breaker becomes half-open.
         on_close: Called when the breaker closes.
         on_state_change: Called after any of the above, with the same event.
         on_success: Called when an execution is recorded as a success.
         on_failure: Called when an execution is recorded as a failure.
-        rng: The source of delay jitter. Injectable so tests are deterministic.
+        rng: Custom source of delay jitter (e.g. for testing).
     """
 
     __slots__ = (
@@ -290,7 +291,7 @@ class CircuitBreaker:
 
         Mutating: an open breaker whose delay has elapsed becomes half-open here, and a
         half-open breaker spends one of its bounded trial permits. Pair every granted
-        permit with :meth:`record_success` or :meth:`record_failure`.
+        permit with `record_success` or `record_failure`.
         """
         events: list[tuple[Listeners, StateChangedEvent]] = []
         with self._lock:

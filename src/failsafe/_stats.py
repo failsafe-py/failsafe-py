@@ -18,7 +18,7 @@ __all__ = ["CountingStats", "Stats", "TimedStats", "TimedUsage", "round2"]
 def round2(value: float) -> float:
     """Round half away from zero to two decimals, as Go's ``util.Round``.
 
-    :func:`round` would use banker's rounding, which disagrees with Go at exactly .005.
+    `round` would use banker's rounding, which disagrees with Go at exactly .005.
     """
     return math.floor(value * 100 + 0.5) / 100
 
@@ -118,7 +118,7 @@ class TimedStats:
 
 
 class TimedUsage:
-    """A total over a rolling period, bucketed as :class:`TimedStats` is.
+    """A total over a rolling period, bucketed as `TimedStats` is.
 
     Backs the usage tracker's per-user totals, so a user who was heavy an hour ago is
     not still paying for it.

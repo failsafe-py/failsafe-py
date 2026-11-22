@@ -46,7 +46,7 @@ _STEP_FACTOR = 1
 
 @dataclass(frozen=True, slots=True)
 class LimitChangedEvent:
-    """An :class:`AdaptiveLimiter`'s concurrency limit changed.
+    """An [`AdaptiveLimiter`][failsafe.AdaptiveLimiter]'s concurrency limit changed.
 
     Attributes:
         old_limit: The limit before the change.
@@ -59,7 +59,7 @@ class LimitChangedEvent:
 
 @dataclass(frozen=True, slots=True)
 class _QueueStats:
-    """A limiter's queueing, as reported to a :class:`~failsafe._prioritizer.Prioritizer`."""
+    """A limiter's queueing, as reported to a [`Prioritizer`][failsafe.Prioritizer]."""
 
     limit: int
     queued: int
@@ -98,7 +98,7 @@ def queue_prioritizer(
     on_threshold_changed: Listener | None = None,
     on_calibrated: Listener | None = None,
 ) -> Prioritizer:
-    """Create a :class:`~failsafe._prioritizer.Prioritizer` driven by limiter queueing.
+    """Create a [`Prioritizer`][failsafe.Prioritizer] driven by limiter queueing.
 
     Args:
         level_tracker: Where accepted levels are recorded. Shared if given.
@@ -107,7 +107,7 @@ def queue_prioritizer(
         on_calibrated: Called after every calibration, whether or not it moved.
 
     Returns:
-        A prioritizer for :class:`AdaptiveLimiter` instances.
+        A prioritizer for [`AdaptiveLimiter`][failsafe.AdaptiveLimiter] instances.
     """
     return Prioritizer(
         _QueueRejectionStrategy(),
@@ -152,13 +152,13 @@ class _Permit:
 class AdaptiveLimiter:
     """Limits concurrency to what a resource can actually sustain, and keeps adjusting.
 
-    A :class:`~failsafe.Bulkhead` enforces a limit you picked; this one discovers it.
+    A [`Bulkhead`][failsafe.Bulkhead] enforces a limit you picked; this one discovers it.
     Recent execution times are compared against a baseline average: when they trend up
     the limit falls, when they trend down it rises. During overload it converges on the
     machine's real capacity, which no fixed number tracks across deploys and traffic
     shifts.
 
-    Executions beyond the limit raise :exc:`~failsafe.LimitExceeded` unless queueing is
+    Executions beyond the limit raise [`LimitExceeded`][failsafe.LimitExceeded] unless queueing is
     enabled, which lets a bounded number wait instead of failing outright.
 
     One instance models one resource, so share it across every call that reaches it::
@@ -194,8 +194,8 @@ class AdaptiveLimiter:
             indefinitely.
         on_limit_exceeded: Called when an execution is rejected.
         on_limit_changed: Called when the concurrency limit moves.
-        clock: The time source. Injectable so tests need not sleep.
-        rng: The source of rejection randomness. Injectable so tests are deterministic.
+        clock: Custom time source for delays and windows (e.g. for testing).
+        rng: Custom source of rejection randomness (e.g. for testing).
 
     Raises:
         ValueError: If the limits are inconsistent or a factor is out of range.
@@ -437,7 +437,7 @@ class AdaptiveLimiter:
             priority: A priority to judge against, overriding any in scope.
 
         Returns:
-            A permit whose :meth:`_Permit.record` must be called when the execution ends.
+            A permit whose `_Permit.record` must be called when the execution ends.
 
         Raises:
             LimitExceeded: If the execution was rejected, or waited too long.
@@ -454,7 +454,7 @@ class AdaptiveLimiter:
             priority: A priority to judge against, overriding any in scope.
 
         Returns:
-            A permit whose :meth:`_Permit.record` must be called when the execution ends.
+            A permit whose `_Permit.record` must be called when the execution ends.
 
         Raises:
             LimitExceeded: If the execution was rejected, or waited too long.

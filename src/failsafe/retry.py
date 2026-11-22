@@ -39,30 +39,29 @@ class RetryPolicy:
             A result-only condition such as ``handle=None`` adds to the default rather
             than replacing it, matching Go.
         abort: What should stop retrying immediately, failing with that result rather
-            than :exc:`~failsafe.RetriesExceeded`. Only evaluated for outcomes that
+            than [`RetriesExceeded`][failsafe.RetriesExceeded]. Only evaluated for outcomes that
             ``handle`` already considers failures.
         delay: How long to wait between attempts. Seconds, a timedelta,
-            :class:`~failsafe.Fixed`, :class:`~failsafe.Backoff`,
-            :class:`~failsafe.RandomDelay`, or a callable taking the execution.
+            [`Fixed`][failsafe.Fixed], [`Backoff`][failsafe.Backoff],
+            [`RandomDelay`][failsafe.RandomDelay], or a callable taking the execution.
         max_retries: How many retries to allow after the first attempt, so the default
             of 2 permits 3 attempts. ``None`` allows unlimited retries, bounded only by
             ``max_duration``.
         max_duration: Give up once this many seconds have elapsed since the execution
             began. Delays are clamped so a long backoff never overshoots it.
         return_last_failure: Raise or return the last failure itself rather than
-            wrapping it in :exc:`~failsafe.RetriesExceeded`.
-        budget: A :class:`~failsafe.Budget` limiting what share of in-flight work
+            wrapping it in [`RetriesExceeded`][failsafe.RetriesExceeded].
+        budget: A [`Budget`][failsafe.Budget] limiting what share of in-flight work
             retries may become. Share one instance across the policies guarding the
             same dependency. Retries refused by the budget fail with
-            :exc:`~failsafe.BudgetExceeded`.
+            [`BudgetExceeded`][failsafe.BudgetExceeded].
         on_retry: Called after each delay, before the next attempt.
         on_retry_scheduled: Called before each delay, with the delay about to elapse.
         on_retries_exceeded: Called once when the limits are reached.
         on_abort: Called once when an ``abort`` condition matches.
         on_success: Called when an attempt is not a failure.
         on_failure: Called after every failed attempt, including retried ones.
-        rng: The source of jitter and random-delay randomness. Injectable so tests
-            are deterministic.
+        rng: Custom source of jitter and random-delay randomness (e.g. for testing).
 
     Raises:
         ValueError: If ``max_retries`` or ``max_duration`` is negative.
