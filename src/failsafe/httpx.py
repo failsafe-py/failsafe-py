@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 
-from ._core import SYSTEM_CLOCK, Clock, Execution
+from ._core import SYSTEM_CLOCK, Clock, Execution, current_execution
 from ._exceptions import FailsafeError
 from .retry import RetryPolicy
 
@@ -158,6 +158,31 @@ def retry_policy(**kwargs: Any) -> RetryPolicy:
     return RetryPolicy(**kwargs)
 
 
+def _apply_deadline(request: httpx.Request) -> None:
+    """Narrow the request's httpx timeouts to the execution's remaining budget.
+
+    A sync [`Timeout`][failsafe.Timeout] cannot interrupt a blocking call, so the
+    deadline only becomes real if whatever blocks is told about it. httpx takes one
+    per phase through ``request.extensions``, which is this transport's equivalent of
+    the request context failsafe-go threads into each attempt.
+
+    Each phase is narrowed rather than overwritten: a client that already asked for a
+    stricter timeout keeps it. The budget is applied per phase, so a request that
+    connects slowly and then reads slowly can still exceed it overall — the policy
+    catches that between attempts.
+    """
+    execution = current_execution()
+    remaining = execution.remaining() if execution is not None else None
+    if remaining is None:
+        return
+    configured = request.extensions.get("timeout", {})
+    narrowed = {
+        phase: remaining if value is None else min(value, remaining)
+        for phase, value in configured.items()
+    } or dict.fromkeys(("connect", "read", "write", "pool"), remaining)
+    request.extensions = {**request.extensions, "timeout": narrowed}
+
+
 def _buffer_body(request: httpx.Request) -> None:
     """Make a streaming request body replayable, so a retry resends it.
 
@@ -213,6 +238,7 @@ class FailsafeTransport(httpx.BaseTransport):
         _buffer_body(request)
 
         def attempt() -> httpx.Response:
+            _apply_deadline(request)
             return self._next.handle_request(request)
 
         try:
@@ -253,6 +279,7 @@ class AsyncFailsafeTransport(httpx.AsyncBaseTransport):
         await _abuffer_body(request)
 
         async def attempt() -> httpx.Response:
+            _apply_deadline(request)
             return await self._next.handle_async_request(request)
 
         try:
