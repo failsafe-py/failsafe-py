@@ -23,7 +23,8 @@ dependencies = []
 httpx = ["httpx>=0.27"]
 
 [project.urls]
-Source = "https://github.com/nicdumz/failsafe-py"
+Source = "https://github.com/failsafe-py/failsafe-py"
+Documentation = "https://failsafe-py.github.io"
 
 [dependency-groups]
 dev = ["pytest>=8", "mypy>=1.11", "ruff>=0.6", "httpx>=0.27"]
