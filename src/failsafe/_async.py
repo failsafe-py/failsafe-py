@@ -90,9 +90,11 @@ class AsyncFailsafe:
         The decorated function keeps its signature, name and docstring.
 
         Example:
-            >>> payments = AsyncFailsafe(retry, breaker)
-            >>> @payments
-            ... async def charge(amount): ...
+            ```python
+            payments = AsyncFailsafe(retry, breaker)
+            @payments
+            async def charge(amount): ...
+            ```
         """
 
         @functools.wraps(fn)

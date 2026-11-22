@@ -28,7 +28,9 @@ class Result:
     ``handle="bad"`` or ``handle=None``.
 
     Example:
-        >>> RetryPolicy(handle=[Result("a"), ConnectionError])  # value OR exception
+        ```python
+        RetryPolicy(handle=[Result("a"), ConnectionError])  # value OR exception
+        ```
     """
 
     value: Any

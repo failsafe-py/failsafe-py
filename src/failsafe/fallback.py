@@ -24,8 +24,10 @@ class Fallback:
     policies; narrow it with ``handle`` if that is not wanted.
 
     Example:
-        >>> Failsafe(Fallback(value=CACHED), retry).call(fetch, key)
-        >>> Failsafe(Fallback(fn=lambda ex: from_cache(ex.last_exception))).call(fetch)
+        ```python
+        Failsafe(Fallback(value=CACHED), retry).call(fetch, key)
+        Failsafe(Fallback(fn=lambda ex: from_cache(ex.last_exception))).call(fetch)
+        ```
 
     Args:
         value: The result to return instead. Pass this or ``fn``, not both.

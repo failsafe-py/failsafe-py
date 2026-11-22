@@ -27,12 +27,14 @@ class RetryPolicy:
     generator rather than on the policy.
 
     Example:
-        >>> retry = RetryPolicy(
-        ...     handle=ConnectionError,
-        ...     delay=Backoff(1.0, 30.0, jitter=Jitter(factor=0.25)),
-        ...     max_retries=3,
-        ... )
-        >>> Failsafe(retry).call(connect, host)
+        ```python
+        retry = RetryPolicy(
+            handle=ConnectionError,
+            delay=Backoff(1.0, 30.0, jitter=Jitter(factor=0.25)),
+            max_retries=3,
+        )
+        Failsafe(retry).call(connect, host)
+        ```
 
     Args:
         max_retries: How many retries to allow after the first attempt, so the default

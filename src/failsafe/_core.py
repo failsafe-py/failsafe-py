@@ -284,9 +284,11 @@ def current_execution() -> Execution | None:
     without every caller threading a parameter through.
 
     Example:
-        >>> def connect(host):
-        ...     ex = current_execution()
-        ...     return do_io(host, timeout=ex.remaining() if ex else None)
+        ```python
+        def connect(host):
+            ex = current_execution()
+            return do_io(host, timeout=ex.remaining() if ex else None)
+        ```
     """
     return _CURRENT.get(None)
 

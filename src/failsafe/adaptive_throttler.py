@@ -129,10 +129,12 @@ class AdaptiveThrottler:
     rather than resetting, so a backend that recovers is not held back by old failures.
 
     One instance models one resource, so share it across every call that reaches that
-    resource::
+    resource:
 
-        throttler = AdaptiveThrottler(failure_rate_threshold=0.2)
-        payments = Failsafe(retry, throttler)
+    ```python
+    throttler = AdaptiveThrottler(failure_rate_threshold=0.2)
+    payments = Failsafe(retry, throttler)
+    ```
 
     Args:
         failure_rate_threshold: The failure rate, from ``0`` to ``1``, above which

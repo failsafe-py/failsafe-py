@@ -150,10 +150,12 @@ class RateLimiter:
     [`RateLimitExceeded`][failsafe.RateLimitExceeded]. Pass ``max_wait_time`` to let it wait
         instead.
 
-    One instance models one resource, so share it across every call that reaches it::
+    One instance models one resource, so share it across every call that reaches it:
 
-        limiter = RateLimiter.smooth(100, period=1.0)
-        api = Failsafe(limiter)
+    ```python
+    limiter = RateLimiter.smooth(100, period=1.0)
+    api = Failsafe(limiter)
+    ```
 
     Attributes:
         on_rate_limit_exceeded: Called when an execution is rejected.
@@ -188,10 +190,12 @@ class RateLimiter:
     ) -> RateLimiter:
         """Build a limiter that spreads executions evenly over time.
 
-        Give either ``max_executions`` with a ``period``, or ``max_rate`` directly::
+        Give either ``max_executions`` with a ``period``, or ``max_rate`` directly:
 
-            RateLimiter.smooth(100, period=1.0)   # 100 per second, one every 10ms
-            RateLimiter.smooth(max_rate=0.01)     # the same, stated as a rate
+        ```python
+        RateLimiter.smooth(100, period=1.0)   # 100 per second, one every 10ms
+        RateLimiter.smooth(max_rate=0.01)     # the same, stated as a rate
+        ```
 
         Args:
             max_executions: Executions permitted per ``period``.

@@ -34,7 +34,9 @@ class Ratio:
     """A threshold of ``count`` out of the last ``capacity`` executions.
 
     Example:
-        >>> CircuitBreaker(failure_threshold=Ratio(3, 5))   # 3 of the last 5
+        ```python
+        CircuitBreaker(failure_threshold=Ratio(3, 5))   # 3 of the last 5
+        ```
 
     Args:
         count: How many must match.
@@ -59,7 +61,9 @@ class Rate:
     """A threshold on the proportion of failures within a time period.
 
     Example:
-        >>> CircuitBreaker(failure_threshold=Rate(0.5, min_executions=20, period=60.0))
+        ```python
+        CircuitBreaker(failure_threshold=Rate(0.5, min_executions=20, period=60.0))
+        ```
 
     Args:
         rate: The failing proportion that trips the breaker, between 0 and 1.
@@ -102,11 +106,13 @@ class CircuitBreaker:
     at the same time.
 
     Example:
-        >>> breaker = CircuitBreaker(
-        ...     failure_threshold=Rate(0.5, min_executions=20, period=60.0),
-        ...     success_threshold=3,
-        ...     delay=Fixed(60.0, jitter=Jitter(factor=0.2)),
-        ... )
+        ```python
+        breaker = CircuitBreaker(
+            failure_threshold=Rate(0.5, min_executions=20, period=60.0),
+            success_threshold=3,
+            delay=Fixed(60.0, jitter=Jitter(factor=0.2)),
+        )
+        ```
 
     Args:
         failure_threshold: What opens the breaker. An ``int`` means that many

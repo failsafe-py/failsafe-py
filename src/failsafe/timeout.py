@@ -18,10 +18,12 @@ class Timeout:
     """Fails an execution that exceeds a time limit.
 
     Composition order decides what the limit covers. Outside a retry it bounds all
-    attempts together; inside one it bounds each attempt separately::
+    attempts together; inside one it bounds each attempt separately:
 
-        Failsafe(Timeout(10.0), retry)   # 10s for everything
-        Failsafe(retry, Timeout(10.0))   # 10s per attempt
+    ```python
+    Failsafe(Timeout(10.0), retry)   # 10s for everything
+    Failsafe(retry, Timeout(10.0))   # 10s per attempt
+    ```
 
     [`TimeoutExceeded`][failsafe.TimeoutExceeded] is an ordinary failure, so an outer
     [`RetryPolicy`][failsafe.RetryPolicy] can retry it. An `asyncio.CancelledError`

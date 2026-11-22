@@ -34,9 +34,11 @@ class Failsafe:
     """Executes functions under a composition of policies.
 
     Policies are composed around the function from left to right, so the leftmost is
-    outermost and the rightmost handles the function's result first::
+    outermost and the rightmost handles the function's result first:
 
-        Failsafe(fallback, retry, breaker)   # fallback(retry(breaker(fn)))
+    ```python
+    Failsafe(fallback, retry, breaker)   # fallback(retry(breaker(fn)))
+    ```
 
     The composition is built once, here, rather than per call. Stateful policies
     accumulate state across executions, so a reused instance measures whatever its
@@ -101,9 +103,11 @@ class Failsafe:
         checker can catch.
 
         Example:
-            >>> payments = Failsafe(retry, breaker)
-            >>> @payments
-            ... def charge(amount): ...
+            ```python
+            payments = Failsafe(retry, breaker)
+            @payments
+            def charge(amount): ...
+            ```
         """
 
         @functools.wraps(fn)

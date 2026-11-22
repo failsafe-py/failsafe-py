@@ -35,11 +35,13 @@ class Budget:
     A retry storm is self-inflicted load: the attempts that were meant to paper over
     a few failures become most of the traffic to an already struggling service. One
     budget shared between policies bounds that, letting extra attempts through only
-    while they stay a small fraction of normal traffic::
+    while they stay a small fraction of normal traffic:
 
-        budget = Budget()
-        api = Failsafe(RetryPolicy(budget=budget))
-        search = Failsafe(RetryPolicy(budget=budget))
+    ```python
+    budget = Budget()
+    api = Failsafe(RetryPolicy(budget=budget))
+    search = Failsafe(RetryPolicy(budget=budget))
+    ```
 
     Share one instance across the policies guarding the same dependency; a budget
     per policy bounds nothing, since the dependency sees their sum.

@@ -161,10 +161,12 @@ class AdaptiveLimiter:
     Executions beyond the limit raise [`LimitExceeded`][failsafe.LimitExceeded] unless queueing is
     enabled, which lets a bounded number wait instead of failing outright.
 
-    One instance models one resource, so share it across every call that reaches it::
+    One instance models one resource, so share it across every call that reaches it:
 
-        limiter = AdaptiveLimiter()
-        failsafe = Failsafe(limiter)
+    ```python
+    limiter = AdaptiveLimiter()
+    failsafe = Failsafe(limiter)
+    ```
 
     Args:
         min_limit: The floor for the concurrency limit.
