@@ -61,9 +61,12 @@ at your own risk.
     any previously registered listener; this takes a single callable keyword and
     offers no post-construction registration. Combine observers into one function.
 
-1. **Cache keys come from the call arguments.** Go reads a key out of the `Context`.
-    Here `CachePolicy(cache, key=lambda user_id: ...)` is a function of the arguments,
-    shaped like `functools.lru_cache`, because that is what a key almost always is.
+1. **Cache keys default to the call arguments.** Go only reads a key out of the
+    `Context`. Here `CachePolicy(cache, key=lambda user_id: ...)` is a function of the
+    arguments, shaped like `functools.lru_cache`, because that is what a key almost
+    always is. Go's mechanism exists too — a `cache_key(...)` block overrides `key=`,
+    just as a context key overrides the policy's in Go — so this adds a spelling
+    rather than replacing one. With neither, the execution runs uncached.
 
 1. **Priority and user are contextvars, not context values.** Ambient and
     request-scoped, as in Go, but propagated by `contextvars` rather than threaded
