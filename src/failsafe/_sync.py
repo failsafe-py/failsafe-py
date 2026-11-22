@@ -38,9 +38,10 @@ class Failsafe:
 
         Failsafe(fallback, retry, breaker)   # fallback(retry(breaker(fn)))
 
-    The composition is built once, here, rather than per call. Construct one instance
-    per backend and reuse it: stateful policies model the health of a backend, so
-    constructing them per call site fragments their signal.
+    The composition is built once, here, rather than per call. Stateful policies
+    accumulate state across executions, so a reused instance measures whatever its
+    callers have in common — one per backend tracks that backend, one per operation
+    tracks something narrower.
 
     The result type is inferred from the function passed to `call`, so one
     composition can guard calls returning different types.
