@@ -2,7 +2,7 @@
 
 Discovers a dependency's real concurrency limit.
 
-[Guide: Adaptive limiter](https://failsafe-py.github.io/adaptive-limiter){ .md-button }
+Guide: [Adaptive limiter](https://failsafe-py.github.io/adaptive-limiter)
 
 ::: failsafe.AdaptiveLimiter
 

@@ -2,7 +2,7 @@
 
 Sheds load when a dependency's failure rate climbs.
 
-[Guide: Adaptive throttler](https://failsafe-py.github.io/adaptive-throttler){ .md-button }
+Guide: [Adaptive throttler](https://failsafe-py.github.io/adaptive-throttler)
 
 ::: failsafe.AdaptiveThrottler
 

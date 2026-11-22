@@ -2,7 +2,7 @@
 
 How long to wait between attempts.
 
-[Guide: Retry](https://failsafe-py.github.io/retry){ .md-button }
+Guide: [Retry](https://failsafe-py.github.io/retry)
 
 ::: failsafe.Delay
 
