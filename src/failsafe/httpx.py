@@ -161,10 +161,11 @@ def retry_policy(**kwargs: Any) -> RetryPolicy:
 def _apply_deadline(request: httpx.Request) -> None:
     """Narrow the request's httpx timeouts to the execution's remaining budget.
 
-    A sync [`Timeout`][failsafe.Timeout] cannot interrupt a blocking call, so the
-    deadline only becomes real if whatever blocks is told about it. httpx takes one
-    per phase through ``request.extensions``, which is this transport's equivalent of
-    the request context failsafe-go threads into each attempt.
+    Sync only. A sync [`Timeout`][failsafe.Timeout] cannot interrupt a blocking call,
+    so the deadline only becomes real if whatever blocks is told about it. httpx takes
+    one per phase through ``request.extensions``, which is this transport's equivalent
+    of the request context failsafe-go threads into each attempt. The async transport
+    needs none of this: `asyncio.timeout` cancels the attempt outright.
 
     Each phase is narrowed rather than overwritten: a client that already asked for a
     stricter timeout keeps it. The budget is applied per phase, so a request that
@@ -278,12 +279,8 @@ class AsyncFailsafeTransport(httpx.AsyncBaseTransport):
         """Perform one failsafe round trip."""
         await _abuffer_body(request)
 
-        async def attempt() -> httpx.Response:
-            _apply_deadline(request)
-            return await self._next.handle_async_request(request)
-
         try:
-            return await self._failsafe.call(attempt)
+            return await self._failsafe.call(self._next.handle_async_request, request)
         except FailsafeError as exc:
             raise _as_http_error(exc, request) from exc
 

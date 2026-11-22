@@ -9,6 +9,7 @@ The inner transport is :class:`Recorder` wherever a request body matters, becaus
 from __future__ import annotations
 
 import asyncio
+import time
 from collections.abc import AsyncIterator, Callable
 from typing import Any
 
@@ -395,3 +396,28 @@ def test_a_stricter_client_timeout_is_not_widened() -> None:
     httpx.Client(transport=transport, timeout=0.5).get("http://x/")
 
     assert seen[0]["read"] == pytest.approx(0.5), f"client's stricter value kept, got {seen[0]}"
+
+
+def test_the_async_timeout_interrupts_a_hung_request() -> None:
+    """Async needs no deadline handover: asyncio.timeout cancels the attempt outright.
+
+    The sync transport narrows ``request.extensions["timeout"]`` because a blocking
+    call cannot be interrupted. Async can be, so a backend that never replies is cut
+    off at the policy's budget with nothing handed to httpx.
+    """
+
+    class Hanging(httpx.AsyncBaseTransport):
+        async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+            await asyncio.sleep(30)
+            raise AssertionError("the attempt should have been cancelled")
+
+    async def main() -> float:
+        transport = AsyncFailsafeTransport(Timeout(0.05), transport=Hanging())
+        client = httpx.AsyncClient(transport=transport, timeout=None)
+        start = time.perf_counter()
+        with pytest.raises(httpx.TransportError):
+            await client.get("http://x/")
+        return time.perf_counter() - start
+
+    elapsed = asyncio.run(main())
+    assert elapsed < 1.0, f"cancelled at the deadline, not after the sleep, got {elapsed:.2f}s"
