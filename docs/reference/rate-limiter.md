@@ -2,7 +2,7 @@
 
 Caps the rate of executions.
 
-[Guide: Rate limiter](https://failsafe-py.github.io/rate-limiter){ .md-button }
+Guide: [Rate limiter](https://failsafe-py.github.io/rate-limiter)
 
 ::: failsafe.RateLimiter
 
