@@ -1,10 +1,7 @@
 # failsafe-py API reference
 
-Generated from the docstrings in `failsafe`, a port of
-[failsafe-go](https://github.com/failsafe-go/failsafe-go).
-
-This is the API reference. The prose guide — concepts, usage, comparisons — lives at
-[failsafe-py.github.io](https://failsafe-py.github.io).
+This is the docstring-generated API reference. The prose guide — concepts, usage,
+comparisons — lives at [failsafe-py.github.io](https://failsafe-py.github.io).
 
 ## Shape of the library
 
