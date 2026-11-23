@@ -1,4 +1,4 @@
-"""A shared ceiling on retries and hedges, ported from failsafe-go's ``budget``."""
+"""A shared ceiling on retries and hedges."""
 
 from __future__ import annotations
 

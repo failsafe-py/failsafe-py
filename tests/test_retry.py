@@ -1,9 +1,3 @@
-"""RetryPolicy semantics, ported from failsafe-go's retry corpus.
-
-Sources: `retrypolicy/retry_test.go`, `retrypolicy/retryexecutor_test.go`, and the
-behaviours `retryexecutor.go` encodes that those files assume.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -26,7 +20,6 @@ from failsafe._core import FakeClock
 
 
 def test_defaults_allow_three_attempts(clock: FakeClock) -> None:
-    """Go: NewBuilder sets defaultMaxRetries = 2, so 3 attempts."""
     fn = flaky(2)
     assert Failsafe(RetryPolicy(), clock=clock).call(fn) == "ok"
 
@@ -35,7 +28,6 @@ def test_defaults_allow_three_attempts(clock: FakeClock) -> None:
 
 
 def test_retries_exceeded_carries_the_last_failure(clock: FakeClock) -> None:
-    """Go: ExceededError{LastResult, LastError}, with Unwrap exposing the cause."""
     with pytest.raises(RetriesExceeded) as info:
         Failsafe(RetryPolicy(max_retries=1), clock=clock).call(flaky(9))
 
@@ -45,14 +37,12 @@ def test_retries_exceeded_carries_the_last_failure(clock: FakeClock) -> None:
 
 
 def test_return_last_failure_skips_the_wrapper(clock: FakeClock) -> None:
-    """Go: returnLastFailure returns the last failure as-is."""
     policy = RetryPolicy(max_retries=1, return_last_failure=True)
     with pytest.raises(ConnectionError, match="boom 2"):
         Failsafe(policy, clock=clock).call(flaky(9))
 
 
 def test_max_retries_zero_still_wraps(clock: FakeClock) -> None:
-    """Go: failedAttempts (1) > maxRetries (0) exceeds on the first failure."""
     calls = 0
 
     def fn() -> str:
@@ -75,7 +65,6 @@ def test_negative_max_retries_is_rejected() -> None:
 
 
 def test_backoff_doubles_and_caps(clock: FakeClock) -> None:
-    """Go TestGetFixedOrRandomDelay: 2s backoff factor 2, max 30s."""
     policy = RetryPolicy(delay=Backoff(2.0, 30.0, factor=2.0), max_retries=None)
     Failsafe(policy, clock=clock).call(flaky(5))
     assert clock.slept == [2.0, 4.0, 8.0, 16.0, 30.0]
@@ -107,7 +96,6 @@ def test_timedelta_delay_is_accepted(clock: FakeClock) -> None:
 
 
 def test_random_delay_stays_in_range(clock: FakeClock) -> None:
-    """Go TestRandomDelay: delay within [min, max]."""
     policy = RetryPolicy(delay=RandomDelay(1.0, 3.0), max_retries=None)
     Failsafe(policy, clock=clock).call(flaky(20))
     assert len(clock.slept) == 20
@@ -130,7 +118,6 @@ def test_injected_rng_makes_delays_reproducible(clock: FakeClock) -> None:
 
 
 def test_jitter_factor_stays_in_range(clock: FakeClock) -> None:
-    """Go TestJitterFactorDelay: delay within [d*(1-f), d*(1+f)]."""
     policy = RetryPolicy(delay=Fixed(1.0, jitter=Jitter(factor=0.25)), max_retries=None)
     Failsafe(policy, clock=clock).call(flaky(50))
     assert all(0.75 <= slept <= 1.25 for slept in clock.slept)
@@ -138,7 +125,6 @@ def test_jitter_factor_stays_in_range(clock: FakeClock) -> None:
 
 
 def test_absolute_jitter_stays_in_range(clock: FakeClock) -> None:
-    """Go TestJitteredDelay: delay within [d-j, d+j]."""
     policy = RetryPolicy(delay=Fixed(1.0, jitter=Jitter(seconds=0.2)), max_retries=None)
     Failsafe(policy, clock=clock).call(flaky(50))
     assert all(0.8 <= slept <= 1.2 for slept in clock.slept)
@@ -158,7 +144,6 @@ def test_jitter_requires_exactly_one_form() -> None:
 
 
 def test_jitter_does_not_compound_into_the_backoff(clock: FakeClock) -> None:
-    """Go applies jitter to the delay, never to lastDelay, so it cannot compound."""
     policy = RetryPolicy(delay=Backoff(1.0, 100.0, jitter=Jitter(factor=0.5)), max_retries=None)
     Failsafe(policy, clock=clock).call(flaky(4))
     # Each delay is within ±50% of the un-jittered 1, 2, 4, 8 sequence.
@@ -167,14 +152,12 @@ def test_jitter_does_not_compound_into_the_backoff(clock: FakeClock) -> None:
 
 
 def test_callable_delay_sees_the_execution(clock: FakeClock) -> None:
-    """Go WithDelayFunc: the delay is computed per attempt from the execution."""
     policy = RetryPolicy(delay=lambda ex: float(ex.attempts), max_retries=None)
     Failsafe(policy, clock=clock).call(flaky(3))
     assert clock.slept == [1.0, 2.0, 3.0]
 
 
 def test_delay_is_clamped_to_the_max_duration_budget(clock: FakeClock) -> None:
-    """Go adjustForMaxDuration: delay = max(0, min(delay, max_duration - elapsed))."""
     policy = RetryPolicy(delay=100.0, max_duration=10.0, max_retries=None)
     with pytest.raises(RetriesExceeded):
         Failsafe(policy, clock=clock).call(flaky(99))
@@ -182,7 +165,6 @@ def test_delay_is_clamped_to_the_max_duration_budget(clock: FakeClock) -> None:
 
 
 def test_max_duration_stops_retrying(clock: FakeClock) -> None:
-    """Go: maxDurationExceeded is elapsed > maxDuration, checked after a failure."""
     policy = RetryPolicy(delay=3.0, max_duration=10.0, max_retries=None)
     with pytest.raises(RetriesExceeded):
         Failsafe(policy, clock=clock).call(flaky(99))
@@ -190,7 +172,6 @@ def test_max_duration_stops_retrying(clock: FakeClock) -> None:
 
 
 def test_handle_narrows_which_exceptions_retry(clock: FakeClock) -> None:
-    """Go HandleErrorTypes: only the named types are failures."""
     calls = 0
 
     def fn() -> str:
@@ -306,21 +287,18 @@ def test_a_mapping_or_set_value_needs_no_wrapper(clock: FakeClock) -> None:
 
 
 def test_handle_result_retries_a_value(clock: FakeClock) -> None:
-    """Go HandleResult: a returned value counts as a failure."""
     results = iter(["bad", "bad", "good"])
     policy = RetryPolicy(handle="bad", max_retries=5)
     assert Failsafe(policy, clock=clock).call(lambda: next(results)) == "good"
 
 
 def test_result_condition_does_not_replace_default_error_handling(clock: FakeClock) -> None:
-    """Go's errorsChecked: handle=x keeps errors failing."""
     policy = RetryPolicy(handle="bad", max_retries=2)
     with pytest.raises(RetriesExceeded):
         Failsafe(policy, clock=clock).call(flaky(9))
 
 
 def test_an_error_condition_does_replace_default_error_handling(clock: FakeClock) -> None:
-    """Go: once any error-aware condition exists, unmatched errors are not failures."""
     calls = 0
 
     def fn() -> str:
@@ -337,7 +315,6 @@ def test_an_error_condition_does_replace_default_error_handling(clock: FakeClock
 
 
 def test_handle_predicate_sees_result_and_exception(clock: FakeClock) -> None:
-    """Go HandleIf, which also marks errors as checked."""
     seen: list[tuple[object, object]] = []
 
     def predicate(result: object, exc: Exception | None) -> bool:
@@ -351,14 +328,12 @@ def test_handle_predicate_sees_result_and_exception(clock: FakeClock) -> None:
 
 
 def test_conditions_are_ored(clock: FakeClock) -> None:
-    """Go: multiple handle conditions are logically OR'ed."""
     results = iter(["a", "b", "ok"])
     policy = RetryPolicy(handle=lambda result, exc: result in ("a", "b"), max_retries=5)
     assert Failsafe(policy, clock=clock).call(lambda: next(results)) == "ok"
 
 
 def test_abort_stops_retrying_with_the_failure(clock: FakeClock) -> None:
-    """Go AbortOnErrorTypes: the failing result is returned, not RetriesExceeded."""
     calls = 0
 
     def fn() -> str:
@@ -373,7 +348,6 @@ def test_abort_stops_retrying_with_the_failure(clock: FakeClock) -> None:
 
 
 def test_abort_only_applies_to_outcomes_that_are_failures(clock: FakeClock) -> None:
-    """Go: abort is evaluated inside OnFailure, so a success never aborts."""
     policy = RetryPolicy(abort="ok", max_retries=3)
     assert Failsafe(policy, clock=clock).call(lambda: "ok") == "ok"
 
@@ -421,7 +395,6 @@ def test_execution_counters_during_retries(clock: FakeClock) -> None:
 
 
 def test_listener_order_for_a_retried_failure(clock: FakeClock) -> None:
-    """Go order: on_failure, then scheduled, then the delay, then on_retry."""
     log: list[str] = []
     policy = RetryPolicy(
         delay=1.0,
@@ -448,7 +421,6 @@ def test_retries_exceeded_listener_fires_once(clock: FakeClock) -> None:
 
 
 def test_abort_returns_the_failure_when_retries_remain(clock: FakeClock) -> None:
-    """Go: an abort with retries left returns the failure itself, unwrapped."""
     log: list[str] = []
     policy = RetryPolicy(
         abort=PermissionError,
@@ -466,8 +438,6 @@ def test_abort_returns_the_failure_when_retries_remain(clock: FakeClock) -> None
 
 
 def test_exceeded_wins_over_abort_on_the_last_attempt(clock: FakeClock) -> None:
-    """Go OnFailure: on_abort fires, on_retries_exceeded is suppressed, but the
-    returned result is still ExceededError unless return_last_failure."""
     log: list[str] = []
     policy = RetryPolicy(
         abort=PermissionError,

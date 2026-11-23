@@ -56,7 +56,7 @@ _RETRY_AFTER_STATUS_CODES = frozenset({429, 503})
 
 
 def is_retryable(response: httpx.Response | None, exc: Exception | None) -> bool:
-    """Whether a round trip is worth retrying, as Go's ``NewRetryPolicyBuilder`` judges.
+    """Whether a round trip is worth retrying.
 
     Retryable: any `httpx.TransportError` (connection failures, timeouts, read
     errors), plus responses with status 429 or 5xx other than 501.
@@ -87,18 +87,15 @@ def is_retryable(response: httpx.Response | None, exc: Exception | None) -> bool
 def retry_after_delay(ex: Execution | None) -> float:
     """Delay according to a response's ``Retry-After`` header.
 
-    Usable anywhere a callable delay is accepted, in a
-    [`RetryPolicy`][failsafe.RetryPolicy] or a [`CircuitBreaker`][failsafe.CircuitBreaker],
-        mirroring
-    Go's ``DelayFunc``:
+    Usable anywhere a callable delay is accepted, including a
+    [`RetryPolicy`][failsafe.RetryPolicy] or [`CircuitBreaker`][failsafe.CircuitBreaker]:
 
     ```python
     CircuitBreaker(handle=429, delay=retry_after_delay)
     ```
 
-    Both header forms are honoured: delay-seconds, and an HTTP-date, which is
-    converted to a delay from now. Only ``429`` and ``503`` responses are consulted,
-    as in Go.
+    Both header forms are honoured: delay-seconds and an HTTP-date. Only ``429`` and
+    ``503`` responses are consulted.
 
     Args:
         ex: The execution whose last result is inspected, or ``None`` for a manual
@@ -143,8 +140,8 @@ def retry_policy(**kwargs: Any) -> RetryPolicy:
 
     ``return_last_failure`` defaults to ``True``, so exhausting the retries on a
     failing *response* yields that response rather than
-    [`RetriesExceeded`][failsafe.RetriesExceeded]: a 500 is still an answer the caller may want to
-    inspect, and Go returns it too.
+    [`RetriesExceeded`][failsafe.RetriesExceeded]: a 500 is still an answer the caller
+    may want to inspect.
 
     Args:
         **kwargs: Passed to [`RetryPolicy`][failsafe.RetryPolicy].
@@ -212,10 +209,9 @@ class FailsafeTransport(httpx.BaseTransport):
     Policy rejections that never reached the network (an open breaker, a full
     bulkhead) surface as `httpx.TransportError`, so callers catch one family.
 
-    Responses are returned with their stream intact, so
-    `httpx.Client.stream` works through the transport. Note that policies judge
-    the *response headers*: a stream that fails midway has already been judged a
-    success, matching Go, where the policy result is recorded before the body is read.
+    Responses are returned with their stream intact, so `httpx.Client.stream` works
+    through the transport. Policies judge the *response headers*: a stream that fails
+    midway has already been judged a success.
 
     Args:
         *policies: The policies to apply, outermost first.

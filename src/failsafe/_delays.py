@@ -45,9 +45,8 @@ def seconds(duration: float | timedelta) -> float:
 class Jitter:
     """Randomness applied to a computed delay, to decorrelate retrying clients.
 
-    Exactly one of ``factor`` or ``seconds`` applies, keeping Go's two distinct meanings
-    without a polymorphic float where "below 1 means a factor" would silently misread
-    ``jitter=0.5``.
+    Exactly one of ``factor`` or ``seconds`` applies, avoiding a polymorphic float
+    where ``0.5`` could mean either a factor or half a second.
 
     Args:
         factor: Vary each delay by ±``factor`` of itself, so ``0.25`` means ±25%.

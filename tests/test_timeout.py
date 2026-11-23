@@ -1,10 +1,3 @@
-"""Timeout semantics, ported from failsafe-go's `timeout` package.
-
-Sync mode is cooperative, so the sync tests assert the cooperative contract rather
-than Go's preemptive one; PORT.md records the deviation. Async mode matches Go, via
-:func:`asyncio.timeout`.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -69,7 +62,6 @@ def test_timeout_is_retryable_by_an_outer_retry(clock: FakeClock) -> None:
 
 
 def test_timeout_outside_retry_bounds_all_attempts(clock: FakeClock) -> None:
-    """Go: a timeout outside a retry cancels the inner retries."""
     attempts = 0
 
     def slow() -> str:
@@ -173,7 +165,6 @@ def test_a_cooperating_callee_honours_the_deadline() -> None:
 
 
 def test_async_timeout_really_interrupts() -> None:
-    """Go's behaviour exactly: asyncio.timeout interrupts the awaiting attempt."""
 
     async def hang() -> str:
         await asyncio.sleep(30)
@@ -200,7 +191,6 @@ def test_async_timeout_does_not_swallow_user_timeout_error() -> None:
         assert info.value is error
 
     asyncio.run(scenario())
-
 
 
 def test_async_timeout_abandons_inner_retries() -> None:

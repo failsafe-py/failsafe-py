@@ -1,9 +1,3 @@
-"""AdaptiveLimiter, ported from failsafe-go's ``adaptivelimiter`` tests.
-
-The limiter's behaviour is statistical, so every test here drives it through an
-injected clock and records samples explicitly. Nothing sleeps.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -21,7 +15,6 @@ _WARMUP = 10
 
 
 def make_limiter(**kwargs: Any) -> tuple[AdaptiveLimiter, FakeClock]:
-    """A limiter whose baseline is warmed to one second, as Go's test helper does."""
     clock = FakeClock()
     limiter = AdaptiveLimiter(
         recent_window_min_duration=1.0,
@@ -36,13 +29,12 @@ def make_limiter(**kwargs: Any) -> tuple[AdaptiveLimiter, FakeClock]:
 
 
 def record(limiter: AdaptiveLimiter, clock: FakeClock, rtt: float, inflight: int) -> None:
-    """Acquire and record a sample two seconds later, as Go's recordFn does."""
     assert limiter._semaphore.acquire(timeout=0)
     clock.advance(2.0)
     limiter._record(clock.now(), rtt, inflight, dropped=False)
 
 
-def test_defaults_match_go() -> None:
+def test_defaults() -> None:
     limiter = AdaptiveLimiter()
 
     assert limiter.limit == 20

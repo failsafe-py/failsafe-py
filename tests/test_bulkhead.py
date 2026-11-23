@@ -1,5 +1,3 @@
-"""Bulkhead semantics, ported from failsafe-go's bulkhead corpus."""
-
 from __future__ import annotations
 
 import asyncio
@@ -12,7 +10,6 @@ from failsafe._core import FakeClock
 
 
 def test_try_acquire_permit_and_release_permit() -> None:
-    """Go TestTryAcquirePermitAndReleasePermit."""
     bulkhead = Bulkhead(2)
 
     assert bulkhead.try_acquire_permit()
@@ -31,7 +28,6 @@ def test_try_acquire_permit_and_release_permit() -> None:
 
 
 def test_acquire_permit_waits_for_a_release() -> None:
-    """Go TestAcquirePermit: the third acquire blocks until a permit comes back."""
     bulkhead = Bulkhead(2)
     bulkhead.try_acquire_permit()
     bulkhead.try_acquire_permit()
@@ -55,7 +51,6 @@ def test_acquire_permit_waits_for_a_release() -> None:
 
 
 def test_acquire_permit_with_timeout_raises_when_full() -> None:
-    """Go TestAcquirePermitWithMaxWaitTime."""
     bulkhead = Bulkhead(1)
 
     bulkhead.acquire_permit(timeout=0.05)

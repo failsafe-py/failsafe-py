@@ -1,5 +1,3 @@
-"""Prioritized rejection, ported from failsafe-go's prioritizer and prioritized tests."""
-
 from __future__ import annotations
 
 import contextlib
@@ -26,7 +24,6 @@ from failsafe.adaptive_throttler import _ThrottlerRejectionStrategy, _ThrottlerS
 
 
 def test_queue_strategy_sums_every_limiters_queueing() -> None:
-    """Go's TestQueueRejectionStrategy_CombineStats, value for value."""
     combined = _QueueRejectionStrategy().combine(
         [
             _QueueStats(limit=5, queued=1, rejection_threshold=8, max_queue=10),
@@ -75,7 +72,6 @@ def test_registered_policies_counts_registrations() -> None:
 
 
 def test_calibrate_computes_a_rate_from_queueing() -> None:
-    """Go's TestPrioritizer_Calibrate: three queued, threshold 2, max queue 4."""
     prioritizer = queue_prioritizer()
     limiter = AdaptiveLimiter(
         min_limit=1,
@@ -226,7 +222,6 @@ def test_accepted_levels_are_recorded_only_while_overloaded() -> None:
 
 
 def test_usage_ranking_decides_between_users_at_one_priority() -> None:
-    """Go's TestPriorityLimiter_CanAcquirePermit with a usage tracker."""
     usage = UsageTracker(window=60.0, max_users=10)
     prioritizer = queue_prioritizer(usage_tracker=usage)
     limiter = AdaptiveLimiter(
@@ -312,11 +307,6 @@ def test_an_unprioritized_throttler_is_unchanged() -> None:
 
 
 class _Queuer:
-    """Queues executions that hold their permits until released, as Go's tests do.
-
-    Recording a permit immediately would drain the queue before the assertion runs.
-    """
-
     def __init__(self) -> None:
         self._release = threading.Event()
         self._threads: list[threading.Thread] = []

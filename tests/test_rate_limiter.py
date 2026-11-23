@@ -1,9 +1,3 @@
-"""RateLimiter semantics, ported from failsafe-go's ratelimiter corpus.
-
-Go's stats tests drive a ``TestStopwatch`` directly; here :class:`FakeClock` plays
-that part, and wait times are asserted in milliseconds to match Go's tables.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -17,7 +11,6 @@ from failsafe.rate_limiter import _NANOS, _BurstyStats, _SmoothStats
 
 
 def ms(limiter: RateLimiter, permits: int = 1) -> int:
-    """Reserve permits and return the wait in whole milliseconds, as Go's tests do."""
     return round(limiter.reserve_permit(permits) * 1000)
 
 
@@ -47,14 +40,12 @@ def next_free_ms(limiter: RateLimiter) -> int:
 
 
 def bursty_stats(limiter: RateLimiter) -> _BurstyStats:
-    """The bursty limiter's internals, which Go's corpus asserts against directly."""
     stats = limiter._stats
     assert isinstance(stats, _BurstyStats)
     return stats
 
 
 def test_smooth_acquire_permits(clock: FakeClock) -> None:
-    """Go TestSmoothAcquirePermits: wait times and next-free time over a timeline."""
     limiter = RateLimiter.smooth(max_rate=0.5, clock=clock)
 
     assert ms_n(limiter, 1, 7) == 3000
@@ -82,7 +73,6 @@ def test_smooth_acquire_permits(clock: FakeClock) -> None:
 
 
 def test_smooth_acquire_permits_at_200ms(clock: FakeClock) -> None:
-    """Go TestSmoothAcquirePermits, second half: 1 permit every 200ms."""
     limiter = RateLimiter.smooth(max_rate=0.2, clock=clock)
 
     assert ms(limiter, 3) == 400
@@ -98,7 +88,6 @@ def test_smooth_acquire_permits_at_200ms(clock: FakeClock) -> None:
 
 
 def test_smooth_next_free_time_is_consistent(clock: FakeClock) -> None:
-    """Go's assertSmoothRateLimiterStats invariant: next free == elapsed + wait + interval."""
     limiter = RateLimiter.smooth(max_rate=0.5, clock=clock)
     for elapsed in (0, 800, 2300, 3500, 9100, 11000):
         at(clock, elapsed)
@@ -107,7 +96,6 @@ def test_smooth_next_free_time_is_consistent(clock: FakeClock) -> None:
 
 
 def test_smooth_initial_stats(clock: FakeClock) -> None:
-    """Go TestSmoothAcquireInitialStats: the first permit is always free."""
     limiter = RateLimiter.smooth(max_rate=100e-9, clock=clock)
 
     assert limiter.reserve_permit() == 0
@@ -118,7 +106,6 @@ def test_smooth_initial_stats(clock: FakeClock) -> None:
 
 
 def test_smooth_initial_stats_with_gaps(clock: FakeClock) -> None:
-    """Go TestSmoothAcquireInitialStats, second half: idle time frees permits."""
     limiter = RateLimiter.smooth(max_rate=100e-9, clock=clock)
 
     assert limiter.reserve_permit() == 0
@@ -129,7 +116,6 @@ def test_smooth_initial_stats_with_gaps(clock: FakeClock) -> None:
 
 
 def test_bursty_acquire_permits(clock: FakeClock) -> None:
-    """Go TestBurstyAcquirePermits: 2 permits per second, tracked into deficit."""
     limiter = RateLimiter.bursty(2, 1.0, clock=clock)
     stats = bursty_stats(limiter)
 
@@ -159,7 +145,6 @@ def test_bursty_acquire_permits(clock: FakeClock) -> None:
 
 
 def test_bursty_acquire_permits_with_five_per_second(clock: FakeClock) -> None:
-    """Go TestBurstyAcquirePermits, second half: 5 permits per second."""
     limiter = RateLimiter.bursty(5, 1.0, clock=clock)
     stats = bursty_stats(limiter)
 
@@ -181,7 +166,6 @@ def test_bursty_acquire_permits_with_five_per_second(clock: FakeClock) -> None:
 
 @pytest.mark.parametrize("flavour", ["smooth", "bursty"])
 def test_permits_are_acquired_equally_one_at_a_time_or_together(flavour: str) -> None:
-    """Go TestShouldAcquirePermitsEqually: N at once equals N one at a time."""
 
     def build() -> tuple[RateLimiter, FakeClock]:
         c = FakeClock()
@@ -208,7 +192,6 @@ def ms_n_raw(limiter: RateLimiter, times: int) -> float:
 
 @pytest.mark.parametrize("flavour", ["smooth", "bursty"])
 def test_first_permit_has_zero_wait(flavour: str, clock: FakeClock) -> None:
-    """Go TestShouldHaveZeroWaitTime."""
     if flavour == "smooth":
         limiter = RateLimiter.smooth(max_rate=500.0, clock=clock)
     else:
@@ -246,10 +229,9 @@ def test_try_acquire_permit_does_not_consume_on_refusal(clock: FakeClock) -> Non
 
 
 def test_try_reserve_permit_refuses_a_wait_that_is_too_long(clock: FakeClock) -> None:
-    """Go's TryReservePermits: -1 when the wait exceeds the max."""
     limiter = RateLimiter.smooth(max_rate=1.0, clock=clock)
     assert limiter.try_reserve_permit(0.5) == 0, "the first permit is free"
-    assert limiter.try_reserve_permit(0.5) == -1.0, "the second needs a full second"
+    assert limiter.try_reserve_permit(0.5) is None, "the second needs a full second"
     assert limiter.try_reserve_permit(2.0) == pytest.approx(1.0)
 
 
@@ -260,7 +242,6 @@ def test_reserve_permit_always_reserves(clock: FakeClock) -> None:
 
 
 def test_reset_discards_reservations(clock: FakeClock) -> None:
-    """Go's Reset."""
     limiter = RateLimiter.smooth(max_rate=1.0, clock=clock)
     for _ in range(5):
         limiter.reserve_permit()
@@ -307,7 +288,6 @@ def test_executor_rejects_a_wait_beyond_max_wait_time(clock: FakeClock) -> None:
 
 
 def test_max_wait_time_does_not_apply_to_standalone_acquire(clock: FakeClock) -> None:
-    """Go documents the asymmetry: max_wait_time is an executor-only setting."""
     limiter = RateLimiter.smooth(max_rate=1.0, max_wait_time=0.0, clock=clock)
 
     limiter.acquire_permit()

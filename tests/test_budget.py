@@ -1,5 +1,3 @@
-"""Budget semantics, ported from failsafe-go's budget corpus."""
-
 from __future__ import annotations
 
 import asyncio
@@ -19,11 +17,6 @@ from failsafe._core import FakeClock
 
 
 def saturate(budget: Budget, executions: int, extra: int) -> None:
-    """Put the budget in a state as if other executions were already in flight.
-
-    Go's tests reach into the budget's counters for this, since acquiring permits
-    the normal way raises the denominator as well as the numerator.
-    """
     budget._executions = executions
     budget._extra = extra
 
@@ -38,7 +31,6 @@ def test_rejects_invalid_configuration() -> None:
 
 
 def test_acquires_and_releases_permits() -> None:
-    """Go TestBudget/should acquire and release permit."""
     budget = Budget(max_rate=0.5, min_concurrency=1)
     assert budget.rate == 0.0
 
@@ -52,11 +44,6 @@ def test_acquires_and_releases_permits() -> None:
 
 
 def test_min_concurrency_allows_a_permit_despite_the_rate() -> None:
-    """Go TestBudget/when minConcurrency floor allows permit despite rate exceeded.
-
-    A quiet service must still retry: with one execution in flight the rate is
-    already at its ceiling, and only the floor lets the attempt through.
-    """
     budget = Budget(max_rate=0.5, min_concurrency=2)
     saturate(budget, executions=1, extra=1)
 
@@ -80,7 +67,6 @@ def test_rate_counts_extra_attempts_against_executions() -> None:
 
 
 def test_retry_proceeds_while_the_budget_allows_it() -> None:
-    """Go TestBudget/when retries not exceeded."""
     budget = Budget(max_rate=0.5, min_concurrency=1)
     saturate(budget, executions=2, extra=1)
     calls: list[int] = []
@@ -96,7 +82,6 @@ def test_retry_proceeds_while_the_budget_allows_it() -> None:
 
 
 def test_retry_stops_when_the_budget_is_exceeded() -> None:
-    """Go TestBudget/when retries exceeded: the retry is refused, not merely delayed."""
     events: list[BudgetExceededEvent] = []
     budget = Budget(max_rate=0.5, min_concurrency=1, on_exceeded=events.append)
     saturate(budget, executions=2, extra=2)
@@ -158,11 +143,6 @@ def test_one_budget_shared_across_policies_sees_their_sum() -> None:
 
 
 def test_hedging_stops_when_the_budget_is_exceeded() -> None:
-    """Go TestBudget/when hedges exceeded.
-
-    The initial attempt is never budgeted, so it still produces a result; only the
-    hedge is refused.
-    """
     events: list[BudgetExceededEvent] = []
     budget = Budget(max_rate=0.5, min_concurrency=1, on_exceeded=events.append)
     saturate(budget, executions=2, extra=2)
@@ -183,7 +163,6 @@ def test_hedging_stops_when_the_budget_is_exceeded() -> None:
 
 
 def test_hedging_proceeds_while_the_budget_allows_it() -> None:
-    """Go TestBudget/when hedges not exceeded."""
     budget = Budget(max_rate=0.5, min_concurrency=1)
     saturate(budget, executions=2, extra=1)
     started: list[int] = []

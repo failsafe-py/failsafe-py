@@ -1,7 +1,4 @@
-"""Fault tolerance and resilience policies for Python.
-
-A port of failsafe-go.
-"""
+"""Fault tolerance and resilience policies for Python."""
 
 from ._async import AsyncFailsafe
 from ._conditions import Condition

@@ -101,9 +101,7 @@ class CircuitBreaker:
     The half-open cap is not decoration. Without it every caller that queued up during
     the delay is admitted at once and stampedes a service that is still recovering.
 
-    Stateful: construct one per backend and share it. Its state is guarded by a lock
-    held for microseconds, which is what lets one instance serve sync and async callers
-    at the same time.
+    Stateful: construct one per backend and share it across sync and async callers.
 
     Example:
         ```python
@@ -119,8 +117,8 @@ class CircuitBreaker:
             consecutive failures; a [`Ratio`][failsafe.Ratio] means that many out of the last N;
             a [`Rate`][failsafe.Rate] means that failing proportion over a period.
         success_threshold: How many trial executions must succeed to close the breaker
-            again, as an ``int`` or [`Ratio`][failsafe.Ratio]. Defaults to the failure threshold,
-            matching Go.
+            again, as an ``int`` or [`Ratio`][failsafe.Ratio]. Defaults to the failure
+            threshold.
         delay: How long to stay open before admitting trials. Accepts the same forms as
             a retry delay, including a callable over the execution.
         handle: What counts as a failure. Defaults to any exception.
@@ -237,7 +235,7 @@ class CircuitBreaker:
         """The current state: ``"closed"``, ``"open"`` or ``"half-open"``.
 
         Reading never advances an expired open breaker to half-open; only an execution
-        attempt does, matching Go.
+        attempt does.
         """
         with self._lock:
             return self._state

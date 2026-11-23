@@ -1,9 +1,3 @@
-"""Hedge semantics, ported from failsafe-go's hedgepolicy corpus.
-
-Every test drives a deterministic handoff: an attempt either returns at once or waits
-on a sleep long enough that only cancellation ends it. Nothing races a wall clock.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -56,7 +50,6 @@ def test_sync_rejects_hedging() -> None:
 
 
 def test_no_hedge_when_the_delay_is_not_exceeded() -> None:
-    """Go TestHedgePolicy/should not hedge when delay not exceeded."""
     started: list[int] = []
 
     async def fast() -> str:
@@ -68,7 +61,6 @@ def test_no_hedge_when_the_delay_is_not_exceeded() -> None:
 
 
 def test_hedges_when_the_delay_is_exceeded() -> None:
-    """Go TestHedgePolicy/should hedge when delay exceeded."""
     started: list[int] = []
 
     async def slow_then_fast() -> str:
@@ -83,7 +75,6 @@ def test_hedges_when_the_delay_is_exceeded() -> None:
 
 
 def test_max_hedges_bounds_the_attempts() -> None:
-    """Go TestHedgePolicy/all hedges used: two hedges means three attempts, no more."""
     started: list[int] = []
 
     async def slow() -> str:
@@ -138,11 +129,6 @@ def test_losing_attempts_are_cancelled() -> None:
 
 
 def test_hedges_count_as_attempts_and_hedges() -> None:
-    """Go's CopyForHedge increments both counters, and marks the attempt a hedge.
-
-    Every attempt hangs, so the policy starts every hedge it is allowed and the
-    counters are observable at their maximum.
-    """
     seen: list[tuple[int, int, int, bool]] = []
 
     async def record() -> str:
@@ -181,7 +167,6 @@ def test_a_hedge_is_not_a_retry() -> None:
 
 
 def test_backup_executions_start_immediately() -> None:
-    """Go TestHedgePolicy/backup executions: a zero delay starts every attempt at once."""
     started: list[int] = []
 
     async def numbered() -> int:
@@ -196,7 +181,6 @@ def test_backup_executions_start_immediately() -> None:
 
 
 def test_cancel_on_waits_for_a_matching_result() -> None:
-    """Go TestHedgePolicy/should cancel on result: earlier results do not end it."""
     started: list[int] = []
 
     async def numbered() -> int:
@@ -211,11 +195,6 @@ def test_cancel_on_waits_for_a_matching_result() -> None:
 
 
 def test_the_last_result_is_returned_when_none_is_acceptable() -> None:
-    """Go TestHedgePolicy/should return result with negative delay.
-
-    Nothing matched the cancellation condition, so the execution still has to produce
-    something rather than hang.
-    """
     started: list[int] = []
 
     async def unmatched() -> int:
@@ -228,7 +207,6 @@ def test_the_last_result_is_returned_when_none_is_acceptable() -> None:
 
 
 def test_a_delay_of_none_stops_hedging() -> None:
-    """A delay callable returning None is Go's negative delay: no more hedges."""
     started: list[int] = []
 
     async def slow() -> str:
@@ -291,12 +269,6 @@ def test_on_hedge_fires_for_each_hedge() -> None:
 
 
 def test_the_quantile_times_each_attempt_not_the_whole_execution() -> None:
-    """Go times each attempt inside its own goroutine.
-
-    Recording the hedged execution's total elapsed time instead would feed the
-    concurrent span back into the estimate, inflating the delay that decides whether
-    to hedge at all, so the policy would hedge less and less.
-    """
     clock = FakeClock()
     policy = HedgePolicy(quantile=0.95, quantile_age=30, warmup=1)
     failsafe = AsyncFailsafe(policy, clock=clock)
@@ -335,11 +307,6 @@ def test_the_quantile_times_each_attempt_not_the_whole_execution() -> None:
 
 
 def test_quantile_does_not_hedge_during_warmup() -> None:
-    """Go TestHedgePolicy/should not hedge with quantile during warmup.
-
-    Hedging on an estimate built from a handful of samples would turn a cold start
-    into a burst of duplicate load.
-    """
     started: list[int] = []
 
     async def steady() -> str:
@@ -359,7 +326,6 @@ def test_quantile_does_not_hedge_during_warmup() -> None:
 
 
 def test_quantile_hedges_a_slow_execution_after_warmup() -> None:
-    """Go TestHedgePolicy/should hedge with quantile."""
     clock = FakeClock()
     policy = HedgePolicy(quantile=0.95, quantile_age=30, warmup=5)
     failsafe = AsyncFailsafe(policy, clock=clock)

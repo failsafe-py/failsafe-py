@@ -1,15 +1,3 @@
-"""Regressions ported from failsafe-go's `test/issues`.
-
-Only the issues that apply to phase 1 are here. The rest are out of scope by design:
-
-- issue65, issue73: HTTP body rewind and streaming (phase 3).
-- issue100: ``ComposeAny``/``WithAny``, which generics erasure deletes outright.
-- issue122: gRPC interceptors carrying context values (not ported).
-- issue134: child-context cancellation after completion; no analogue, since sync has no
-  cancellation and async uses task cancellation.
-- issue141: hedge budgets (phase 6).
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -29,11 +17,6 @@ from failsafe._core import FakeClock
 
 
 def test_issue136_concurrent_calls_through_one_executor() -> None:
-    """Go TestIssue136: concurrent calls must not race on a shared executor.
-
-    Go's bug was a shared ``Executor`` mutating per-call state. Our equivalent hazard is
-    the composed chain and the policy objects, which every caller shares.
-    """
     breaker = CircuitBreaker(failure_threshold=100)
     fs = Failsafe(RetryPolicy(max_retries=2), breaker)
     results: list[str] = []
@@ -145,7 +128,6 @@ def test_sync_and_async_callers_share_one_breaker() -> None:
 
 
 def test_retries_exceeded_chains_the_original_traceback() -> None:
-    """Go's ExceededError.Unwrap; ours is __cause__, so `raise from` context survives."""
     with pytest.raises(RetriesExceeded) as info:
         Failsafe(RetryPolicy(max_retries=1)).call(flaky(9))
 
