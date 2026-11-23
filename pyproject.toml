@@ -2,7 +2,7 @@
 name = "failsafe-py"
 version = "0.1.1"
 description = "Fault tolerance and resilience policies for Python"
-readme = "README.md"
+readme = "README-pypi.md"
 requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]
