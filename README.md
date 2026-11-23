@@ -20,7 +20,7 @@ A Python port of [failsafe-go](https://github.com/failsafe-go/failsafe-go). See
 
 ## Project status
 
-This is mostly agentic port of failsafe-go alongside its website, because I
+This is a mostly agentic port of failsafe-go alongside its website, because I
 needed a similar library at work in Python (Google-external equivalent of
 "extensible stubs / canonical stubs"). It was fast to do, "only" costing me
 about a weekend trying to improve the agent's writing / API choices.
