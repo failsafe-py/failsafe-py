@@ -16,7 +16,7 @@ A Python port of [failsafe-go](https://github.com/failsafe-go/failsafe-go). See
 ## Documentation
 
 - [failsafe-py.github.io](https://failsafe-py.github.io) — guides and usage
-- [failsafe-py.readthedocs.io](https://failsafe-py.readthedocs.io) — API reference
+- [failsafe-py.readthedocs.io](https://failsafe-py.readthedocs.io/en/stable/) — API reference
 
 ## Project status
 
