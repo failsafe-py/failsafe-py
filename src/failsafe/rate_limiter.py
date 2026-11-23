@@ -1,4 +1,4 @@
-"""Rate limiting, smooth and bursty, ported from failsafe-go's ``ratelimiter``."""
+"""Smooth and bursty rate limiting."""
 
 from __future__ import annotations
 
@@ -143,8 +143,8 @@ class RateLimiter:
     - **Bursty** (`bursty`) refills a fixed allowance at the start of each
       period, permitting bursts up to that allowance.
 
-    Both reserve permits by pure arithmetic: a reservation returns the time the caller
-    must wait, and waiting happens in the driver, so a reserved permit is never lost.
+    A reservation returns how long the caller must wait and immediately counts against
+    the configured rate.
 
     By default an execution that cannot proceed immediately fails with
     [`RateLimitExceeded`][failsafe.RateLimitExceeded]. Pass ``max_wait_time`` to let it wait
@@ -279,18 +279,21 @@ class RateLimiter:
         """
         return self._reserve(permits, None)
 
-    def try_reserve_permit(self, max_wait_time: float | timedelta, permits: int = 1) -> float:
-        """Reserve permits if the wait is acceptable, returning the seconds to wait.
+    def try_reserve_permit(
+        self, max_wait_time: float | timedelta, permits: int = 1
+    ) -> float | None:
+        """Reserve permits if the wait is acceptable.
 
         Args:
             max_wait_time: The longest acceptable wait.
             permits: How many permits to reserve.
 
         Returns:
-            Seconds to wait, ``0.0`` if the permits are free now, or ``-1.0`` if they
-            were not reserved because the wait would be too long.
+            Seconds to wait, ``0.0`` if the permits are free now, or ``None`` if the
+            wait would be too long and no permits were reserved.
         """
-        return self._reserve(permits, _nanos(max_wait_time, "max_wait_time"))
+        wait = self._reserve(permits, _nanos(max_wait_time, "max_wait_time"))
+        return None if wait < 0 else wait
 
     def try_acquire_permit(self, permits: int = 1) -> bool:
         """Acquire permits only if they are free right now.
@@ -307,8 +310,8 @@ class RateLimiter:
         """Acquire permits, blocking the calling thread until they are available.
 
         Never rejects: ``max_wait_time`` applies only to executions run through a
-        [`Failsafe`][failsafe.Failsafe], matching Go. Use `try_reserve_permit` for a
-        standalone bound on the wait.
+        [`Failsafe`][failsafe.Failsafe]. Use `try_reserve_permit` for a standalone
+        bound on the wait.
 
         Args:
             permits: How many permits to acquire.

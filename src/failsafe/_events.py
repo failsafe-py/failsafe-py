@@ -68,7 +68,7 @@ class ScheduledRetryEvent:
         execution: The execution being retried.
         result: The value from the failed attempt, if any.
         exception: The exception from the failed attempt, if any.
-        delay: Seconds the driver is about to wait, after jitter and clamping.
+        delay: Seconds before the retry, after jitter and clamping.
     """
 
     execution: Execution

@@ -22,9 +22,8 @@ class RetryPolicy:
 
     By default three attempts are made with no delay, and any exception is a failure.
 
-    Stateless and safe to share across executions and across both drivers: every piece
-    of per-execution state, including the backoff's current delay, lives in the
-    generator rather than on the policy.
+    Stateless and safe to share across executions and between `Failsafe` and
+    `AsyncFailsafe`.
 
     Example:
         ```python
@@ -44,8 +43,8 @@ class RetryPolicy:
             [`Fixed`][failsafe.Fixed], [`Backoff`][failsafe.Backoff],
             [`RandomDelay`][failsafe.RandomDelay], or a callable taking the execution.
         handle: What counts as a failure worth retrying. Defaults to any exception.
-            A result-only condition such as ``handle=None`` adds to the default rather
-            than replacing it, matching Go.
+            A result-only condition such as ``handle=None`` adds to the default
+            exception handling rather than replacing it.
         abort: What should stop retrying immediately, failing with that result rather
             than [`RetriesExceeded`][failsafe.RetriesExceeded]. Only evaluated for
             outcomes that ``handle`` already considers failures.

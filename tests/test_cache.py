@@ -1,5 +1,3 @@
-"""Cache semantics, ported from failsafe-go's cachepolicy corpus."""
-
 from __future__ import annotations
 
 import asyncio
@@ -37,7 +35,6 @@ class DictCache:
 
 
 def test_a_hit_skips_the_execution() -> None:
-    """Go TestCache_Get: the second call never reaches the function."""
     cache = DictCache()
     calls: list[int] = []
 
@@ -85,7 +82,6 @@ def test_the_key_sees_keyword_arguments() -> None:
 
 
 def test_a_key_of_none_skips_the_cache() -> None:
-    """Go's empty cache key: no key, no caching, and the execution always runs."""
     cache = DictCache()
     calls: list[int] = []
 
@@ -133,7 +129,6 @@ def test_a_plain_dict_is_a_backend() -> None:
 
 
 def test_a_failure_is_not_cached() -> None:
-    """Go TestCache/should not cache on error: a cached failure outlives the outage."""
     cache = DictCache()
 
     def fails(key: str) -> str:
@@ -147,7 +142,6 @@ def test_a_failure_is_not_cached() -> None:
 
 
 def test_cache_if_narrows_what_is_stored() -> None:
-    """Go TestCache/with condition."""
     cache = DictCache()
     policy = CachePolicy(cache, key=lambda k: k, cache_if="bar")
     failsafe = Failsafe(policy, clock=FakeClock())
@@ -243,7 +237,6 @@ def test_one_cache_shared_between_sync_and_async() -> None:
 
 
 def test_a_cache_key_block_overrides_the_key_callable() -> None:
-    """Go reads the key from the context, which beats the one on the policy."""
     cache = DictCache()
     calls: list[int] = []
 

@@ -1,4 +1,4 @@
-"""Execution prioritization, ported from failsafe-go's ``priority`` package.
+"""Execution prioritization.
 
 During overload a prioritized policy sheds load from the bottom up: each execution
 carries a *level*, and the [`Prioritizer`][failsafe.Prioritizer] computes the level below which

@@ -1,4 +1,4 @@
-"""Adaptive concurrency limiting, ported from failsafe-go's ``adaptivelimiter``."""
+"""Adaptive concurrency limiting."""
 
 from __future__ import annotations
 
@@ -326,8 +326,8 @@ class AdaptiveLimiter:
     def prioritized_by(self, prioritizer: Prioritizer) -> AdaptiveLimiter:
         """Reject by priority level during overload, coordinated by ``prioritizer``.
 
-        Queueing is required for prioritized rejection and is enabled with Go's
-        defaults if it was not configured.
+        Queueing is required for prioritized rejection and is enabled with the default
+        rejection factors if it was not configured.
 
         Args:
             prioritizer: The prioritizer to register with. Share one across policies to

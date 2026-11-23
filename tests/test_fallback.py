@@ -1,5 +1,3 @@
-"""Fallback semantics, ported from failsafe-go's `fallback` package."""
-
 from __future__ import annotations
 
 import pytest
@@ -17,17 +15,14 @@ from failsafe._core import FakeClock
 
 
 def test_value_replaces_a_failure(clock: FakeClock) -> None:
-    """Go NewWithResult."""
     assert Failsafe(Fallback(value="cached"), clock=clock).call(flaky(9)) == "cached"
 
 
 def test_success_passes_through_untouched(clock: FakeClock) -> None:
-    """Go: the fallback does not fire when the result is not a failure."""
     assert Failsafe(Fallback(value="cached"), clock=clock).call(lambda: "live") == "live"
 
 
 def test_fn_sees_the_failure_through_the_execution(clock: FakeClock) -> None:
-    """Go: the fn receives CopyWithResult, so last_exception is the failure handled."""
     seen: list[object] = []
 
     def recover(ex: Execution) -> str:
@@ -39,7 +34,6 @@ def test_fn_sees_the_failure_through_the_execution(clock: FakeClock) -> None:
 
 
 def test_fn_exception_replaces_the_original(clock: FakeClock) -> None:
-    """Go: the fallback's own error becomes the result, unwrapped."""
 
     def failing(ex: Execution) -> str:
         raise RuntimeError("fallback also failed")
@@ -49,7 +43,6 @@ def test_fn_exception_replaces_the_original(clock: FakeClock) -> None:
 
 
 def test_handle_narrows_what_the_fallback_catches(clock: FakeClock) -> None:
-    """Go HandleErrorTypes: an unmatched error is a success, so no fallback."""
     policy = Fallback(value="cached", handle=ConnectionError)
 
     def fn() -> str:
@@ -71,12 +64,6 @@ def test_outermost_fallback_catches_retries_exceeded(clock: FakeClock) -> None:
 
 
 def test_narrowed_fallback_matches_through_the_wrapper(clock: FakeClock) -> None:
-    """Go's ExceededError.Unwrap exposes LastError, so errors.As finds the cause.
-
-    Verified against Go: a Fallback narrowed to the *inner* error type still catches a
-    retries-exceeded wrapper, because the wrapper unwraps to the failure that caused
-    it. The __cause__ walk reproduces this.
-    """
     fs = Failsafe(
         Fallback(value="cached", handle=ConnectionError),
         RetryPolicy(max_retries=1),

@@ -1,4 +1,4 @@
-"""Read-through caching of execution results, ported from failsafe-go's ``cachepolicy``."""
+"""Read-through caching of execution results."""
 
 from __future__ import annotations
 

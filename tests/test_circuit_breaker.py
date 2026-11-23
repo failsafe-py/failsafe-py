@@ -1,9 +1,3 @@
-"""CircuitBreaker semantics, ported from failsafe-go's breaker corpus.
-
-Sources: `circuitbreaker/circuitbreaker_test.go`, `closedstate_test.go`,
-`halfopenstate_test.go`, `openstate_test.go`.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -29,21 +23,18 @@ from failsafe._core import FakeClock
 
 
 def test_default_config_opens_after_one_failure(clock: FakeClock) -> None:
-    """Go TestClosedStateFailureWithDefaultConfig."""
     breaker = CircuitBreaker(clock=clock)
     breaker.record_failure()
     assert breaker.is_open
 
 
 def test_default_config_stays_closed_on_success(clock: FakeClock) -> None:
-    """Go TestClosedStateSuccessWithDefaultConfig."""
     breaker = CircuitBreaker(clock=clock)
     breaker.record_success()
     assert breaker.is_closed
 
 
 def test_opens_after_consecutive_failures(clock: FakeClock) -> None:
-    """Go TestClosedStateFailureWithFailureThreshold: a ring of 3, all failures."""
     breaker = CircuitBreaker(failure_threshold=3, clock=clock)
     breaker.record_failure()
     breaker.record_success()
@@ -55,7 +46,6 @@ def test_opens_after_consecutive_failures(clock: FakeClock) -> None:
 
 
 def test_opens_on_a_failure_ratio(clock: FakeClock) -> None:
-    """Go TestClosedStateFailureWithFailureRatio: 2 of the last 3."""
     breaker = CircuitBreaker(failure_threshold=Ratio(2, 3), clock=clock)
     breaker.record_failure()
     breaker.record_success()
@@ -65,7 +55,6 @@ def test_opens_on_a_failure_ratio(clock: FakeClock) -> None:
 
 
 def test_stays_closed_when_the_ratio_is_never_met(clock: FakeClock) -> None:
-    """Go TestClosedStateSuccessWithFailureRatio: alternating never reaches 3 of 4."""
     breaker = CircuitBreaker(failure_threshold=Ratio(3, 4), clock=clock)
     for _ in range(20):
         breaker.record_success()
@@ -74,7 +63,6 @@ def test_stays_closed_when_the_ratio_is_never_met(clock: FakeClock) -> None:
 
 
 def test_stays_closed_when_the_threshold_is_never_met(clock: FakeClock) -> None:
-    """Go TestClosedStateSuccessWithFailureThreshold."""
     breaker = CircuitBreaker(failure_threshold=2, clock=clock)
     for _ in range(20):
         breaker.record_success()
@@ -86,7 +74,6 @@ def test_stays_closed_when_the_threshold_is_never_met(clock: FakeClock) -> None:
 
 
 def test_open_rejects_until_the_delay_elapses(clock: FakeClock) -> None:
-    """Go TestTryAcquirePermit."""
     breaker = CircuitBreaker(delay=0.1, clock=clock)
     breaker.open()
     assert breaker.is_open
@@ -98,7 +85,6 @@ def test_open_rejects_until_the_delay_elapses(clock: FakeClock) -> None:
 
 
 def test_remaining_delay_counts_down(clock: FakeClock) -> None:
-    """Go TestRemainingDelay and TestNoRemainingDelay."""
     breaker = CircuitBreaker(delay=1.0, clock=clock)
     assert breaker.remaining_delay() == 0.0, "a closed breaker has no delay"
 
@@ -111,7 +97,6 @@ def test_remaining_delay_counts_down(clock: FakeClock) -> None:
 
 
 def test_reading_state_never_advances_to_half_open(clock: FakeClock) -> None:
-    """Go: the transition is lazy, happening only inside tryAcquirePermit."""
     breaker = CircuitBreaker(delay=1.0, clock=clock)
     breaker.open()
     clock.advance(5.0)
@@ -121,7 +106,6 @@ def test_reading_state_never_advances_to_half_open(clock: FakeClock) -> None:
 
 
 def test_jittered_delay_stays_in_range(clock: FakeClock) -> None:
-    """Go TestJitteredDelay: within [delay-jitter, delay+jitter]."""
     for _ in range(100):
         breaker = CircuitBreaker(delay=Fixed(0.1, jitter=Jitter(seconds=0.02)), clock=clock)
         breaker.open()
@@ -129,7 +113,6 @@ def test_jittered_delay_stays_in_range(clock: FakeClock) -> None:
 
 
 def test_jitter_factor_delay_stays_in_range(clock: FakeClock) -> None:
-    """Go TestJitterFactorDelay: within [delay*(1-f), delay*(1+f)]."""
     for _ in range(100):
         breaker = CircuitBreaker(delay=Fixed(0.1, jitter=Jitter(factor=0.25)), clock=clock)
         breaker.open()
@@ -137,7 +120,6 @@ def test_jitter_factor_delay_stays_in_range(clock: FakeClock) -> None:
 
 
 def test_random_delay_stays_in_range(clock: FakeClock) -> None:
-    """Go TestRandomDelay: within [min, max]."""
     for _ in range(100):
         breaker = CircuitBreaker(delay=RandomDelay(0.05, 0.15), clock=clock)
         breaker.open()
@@ -164,7 +146,6 @@ def test_injected_rng_makes_the_delay_reproducible(clock: FakeClock) -> None:
 
 
 def test_open_is_a_noop_when_already_open(clock: FakeClock) -> None:
-    """Go: open() returns early if already open, so the delay does not restart."""
     log: list[str] = []
     breaker = CircuitBreaker(delay=1.0, clock=clock, on_open=lambda e: log.append("open"))
     breaker.open()
@@ -190,7 +171,6 @@ def test_half_open_admits_a_bounded_number_of_trials(clock: FakeClock) -> None:
 
 
 def test_half_open_permit_is_refunded_by_a_result(clock: FakeClock) -> None:
-    """Go: permittedExecutions++ runs after every recorded result."""
     breaker = CircuitBreaker(failure_threshold=1, success_threshold=3, clock=clock)
     breaker.half_open()
     for _ in range(3):
@@ -202,7 +182,6 @@ def test_half_open_permit_is_refunded_by_a_result(clock: FakeClock) -> None:
 
 
 def test_half_open_failure_reopens_with_default_config(clock: FakeClock) -> None:
-    """Go TestHalfOpenStateFailureWithDefaultConfig."""
     breaker = CircuitBreaker(clock=clock)
     breaker.half_open()
     breaker.record_failure()
@@ -210,7 +189,6 @@ def test_half_open_failure_reopens_with_default_config(clock: FakeClock) -> None
 
 
 def test_half_open_success_closes_with_default_config(clock: FakeClock) -> None:
-    """Go TestHalfOpenSuccessWithDefaultConfig."""
     breaker = CircuitBreaker(clock=clock)
     breaker.half_open()
     breaker.record_success()
@@ -218,7 +196,6 @@ def test_half_open_success_closes_with_default_config(clock: FakeClock) -> None:
 
 
 def test_half_open_success_threshold_ignores_the_failure_threshold(clock: FakeClock) -> None:
-    """Go TestHalfOpenFailureWithSuccessAndFailureThresholds: one failure reopens."""
     breaker = CircuitBreaker(success_threshold=3, failure_threshold=2, clock=clock)
     breaker.half_open()
     breaker.record_success()
@@ -229,7 +206,6 @@ def test_half_open_success_threshold_ignores_the_failure_threshold(clock: FakeCl
 
 
 def test_half_open_closes_on_the_success_threshold(clock: FakeClock) -> None:
-    """Go TestHalfOpenSuccessWithSuccessThreshold."""
     breaker = CircuitBreaker(success_threshold=3, clock=clock)
     breaker.half_open()
     for _ in range(2):
@@ -240,7 +216,6 @@ def test_half_open_closes_on_the_success_threshold(clock: FakeClock) -> None:
 
 
 def test_half_open_success_ratio(clock: FakeClock) -> None:
-    """Go TestHalfOpenSuccessWithSuccessRatio: 2 of 3."""
     breaker = CircuitBreaker(success_threshold=Ratio(2, 3), clock=clock)
     breaker.half_open()
     breaker.record_failure()
@@ -251,7 +226,6 @@ def test_half_open_success_ratio(clock: FakeClock) -> None:
 
 
 def test_half_open_reopens_when_the_success_ratio_cannot_be_met(clock: FakeClock) -> None:
-    """Go TestHalfOpenFailureWithSuccessRatio: failures exceed what the ratio allows."""
     breaker = CircuitBreaker(success_threshold=Ratio(2, 3), clock=clock)
     breaker.half_open()
     breaker.record_failure()
@@ -262,7 +236,6 @@ def test_half_open_reopens_when_the_success_ratio_cannot_be_met(clock: FakeClock
 
 
 def test_half_open_failure_ratio_without_success_threshold(clock: FakeClock) -> None:
-    """Go TestHalfOpenFailureWithFailureRatio: 2 of 3."""
     breaker = CircuitBreaker(failure_threshold=Ratio(2, 3), clock=clock)
     breaker.half_open()
     breaker.record_failure()
@@ -273,7 +246,6 @@ def test_half_open_failure_ratio_without_success_threshold(clock: FakeClock) -> 
 
 
 def test_half_open_closes_on_failure_ratio_slack(clock: FakeClock) -> None:
-    """Go TestHalfOpenSuccessWithFailureRatio: successes exceed the ratio's slack."""
     breaker = CircuitBreaker(failure_threshold=Ratio(2, 3), clock=clock)
     breaker.half_open()
     breaker.record_failure()
@@ -284,7 +256,6 @@ def test_half_open_closes_on_failure_ratio_slack(clock: FakeClock) -> None:
 
 
 def test_half_open_has_no_remaining_delay(clock: FakeClock) -> None:
-    """Go TestRemainingDelayInHalfOpenState."""
     breaker = CircuitBreaker(delay=1.0, clock=clock)
     breaker.half_open()
     assert breaker.remaining_delay() == 0.0
@@ -294,7 +265,6 @@ def test_half_open_has_no_remaining_delay(clock: FakeClock) -> None:
 
 
 def test_metrics_track_the_window(clock: FakeClock) -> None:
-    """Go TestGetSuccessAndFailureStats, with its 2-decimal rounding."""
     breaker = CircuitBreaker(
         failure_threshold=Ratio(5, 10), success_threshold=Ratio(15, 20), clock=clock
     )
@@ -311,7 +281,6 @@ def test_metrics_track_the_window(clock: FakeClock) -> None:
 
 
 def test_rate_threshold_needs_min_executions(clock: FakeClock) -> None:
-    """Go WithFailureRateThreshold: nothing opens before min_executions."""
     breaker = CircuitBreaker(
         failure_threshold=Rate(0.5, min_executions=5, period=60.0), clock=clock
     )
@@ -324,7 +293,6 @@ def test_rate_threshold_needs_min_executions(clock: FakeClock) -> None:
 
 
 def test_rate_threshold_window_expires(clock: FakeClock) -> None:
-    """Go timedStats: results outside the period stop counting."""
     breaker = CircuitBreaker(
         failure_threshold=Rate(0.5, min_executions=2, period=10.0), clock=clock
     )
@@ -339,7 +307,6 @@ def test_rate_threshold_window_expires(clock: FakeClock) -> None:
 
 
 def test_rejects_without_invoking_the_function(clock: FakeClock) -> None:
-    """Go: PreExecute returns ErrOpen and innerFn is never called."""
     breaker = CircuitBreaker(failure_threshold=1, delay=60.0, clock=clock)
     fs = Failsafe(breaker, clock=clock)
 
@@ -361,7 +328,6 @@ def test_rejects_without_invoking_the_function(clock: FakeClock) -> None:
 
 
 def test_rejected_attempt_counts_as_an_attempt_not_an_execution(clock: FakeClock) -> None:
-    """Go: Attempts includes blocked attempts, Executions does not."""
     breaker = CircuitBreaker(failure_threshold=1, clock=clock)
     breaker.open()
     fs = Failsafe(RetryPolicy(max_retries=1), breaker, clock=clock)
@@ -424,7 +390,6 @@ def test_state_change_listeners_fire_in_order(clock: FakeClock) -> None:
 
 
 def test_listener_may_reenter_the_breaker(clock: FakeClock) -> None:
-    """Go releases the lock before firing listeners, so they may call back in."""
     seen: list[str] = []
     breaker = CircuitBreaker(
         failure_threshold=1, clock=clock, on_open=lambda e: seen.append(breaker.state)
@@ -449,7 +414,6 @@ def test_state_is_shared_between_drivers(clock: FakeClock) -> None:
 
 
 def test_retry_outside_breaker_sees_rejections(clock: FakeClock) -> None:
-    """Go's recommended composition: RetryPolicy(CircuitBreaker(fn))."""
     breaker = CircuitBreaker(failure_threshold=1, delay=0.0, clock=clock)
     fs = Failsafe(RetryPolicy(max_retries=3), breaker, clock=clock)
     assert fs.call(flaky(2)) == "ok"
@@ -467,7 +431,6 @@ def test_invalid_configuration_is_rejected() -> None:
 
 
 def test_callable_delay_sees_the_failing_execution(clock: FakeClock) -> None:
-    """Go WithDelayFunc: the delay is computed from the execution that tripped it."""
     seen: list[object] = []
 
     def compute(ex: object) -> float:
@@ -483,12 +446,6 @@ def test_callable_delay_sees_the_failing_execution(clock: FakeClock) -> None:
 
 
 def test_manual_open_has_no_execution_for_a_callable_delay(clock: FakeClock) -> None:
-    """A callable delay has no fixed delay to fall back on.
-
-    Go keeps DelayFunc and Delay in separate fields, so a manual Open() falls through
-    to the fixed one. Our single delay= union cannot express that pair, so a
-    callable-only configuration yields no delay, as Go does when neither is set.
-    """
     breaker = CircuitBreaker(failure_threshold=1, delay=lambda ex: 30.0, clock=clock)
     breaker.open()
     assert breaker.is_open

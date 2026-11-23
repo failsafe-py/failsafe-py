@@ -1,4 +1,4 @@
-"""Concurrent backup attempts for slow executions, ported from failsafe-go's ``hedgepolicy``."""
+"""Concurrent backup attempts for slow executions."""
 
 from __future__ import annotations
 

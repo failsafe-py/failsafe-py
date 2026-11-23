@@ -1,4 +1,4 @@
-"""Concurrency limiting, ported from failsafe-go's ``bulkhead``."""
+"""Concurrency limiting."""
 
 from __future__ import annotations
 

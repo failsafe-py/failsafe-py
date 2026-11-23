@@ -144,11 +144,8 @@ class _Counters:
 class Execution:
     """Information about an execution, shared by every policy layer and attempt.
 
-    Mirrors failsafe-go's ``ExecutionInfo`` / ``ExecutionAttempt``. There is no
-    ``cancelled`` flag: sync mode supports deadlines rather than cancellation, and
-    async cancellation surfaces as `asyncio.CancelledError`.
-
-    Attributes are maintained by the core; user code reads them via
+    There is no cancellation flag: sync mode uses deadlines, while async cancellation
+    propagates as `asyncio.CancelledError`. User code reads attributes through
     [`current_execution`][failsafe.current_execution].
 
     Hedged attempts run concurrently against copies of this object: the counts are
@@ -279,9 +276,8 @@ _CURRENT: contextvars.ContextVar[Execution] = contextvars.ContextVar("failsafe_e
 def current_execution() -> Execution | None:
     """Return the [`Execution`][failsafe.Execution] in progress, or ``None`` outside one.
 
-    The replacement for failsafe-go's ``GetWithExecution``: a function running under a
-    policy composition reads its attempt count, elapsed time or remaining deadline
-    without every caller threading a parameter through.
+    User code can read its attempt count, elapsed time, or remaining deadline without
+    threading an execution parameter through every call.
 
     Example:
         ```python

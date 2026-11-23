@@ -1,11 +1,3 @@
-"""failsafe.httpx transports, ported from failsafe-go's failsafehttp client corpus.
-
-Every test runs against an in-process transport. Nothing here touches a network.
-
-The inner transport is :class:`Recorder` wherever a request body matters, because
-:class:`httpx.MockTransport` reads the request before the handler sees it.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -85,7 +77,6 @@ def test_successful_request_passes_through() -> None:
 
 
 def test_retries_a_server_error_then_succeeds() -> None:
-    """Go TestRetryPolicyWith500: 5xx is retryable."""
     handler, sent = responder(500, 500, 200)
     with client(retry_policy(max_retries=3, delay=None), handler=handler) as http:
         response = http.get("http://example.test/")
@@ -105,7 +96,6 @@ def test_does_not_retry_a_client_error() -> None:
 
 
 def test_retries_a_connection_error() -> None:
-    """Go retries url errors; httpx models them as TransportError."""
     attempts = 0
 
     def handle(request: httpx.Request) -> httpx.Response:
@@ -123,7 +113,6 @@ def test_retries_a_connection_error() -> None:
 
 
 def test_does_not_retry_an_unsupported_scheme() -> None:
-    """Go explicitly excludes this: a retry cannot invent protocol support."""
 
     def handle(request: httpx.Request) -> httpx.Response:
         raise httpx.UnsupportedProtocol("unsupported", request=request)
@@ -151,7 +140,6 @@ def test_does_not_retry_an_unsupported_scheme() -> None:
     ],
 )
 def test_retryable_status_codes(status: int, expected: bool) -> None:
-    """The documented retryable set, including Go's 501 exclusion."""
     assert is_retryable(httpx.Response(status), None) is expected
 
 
@@ -204,7 +192,6 @@ def test_response_stream_survives_the_transport() -> None:
 
 
 def test_retry_after_seconds_is_honoured(clock: FakeClock) -> None:
-    """Go's DelayFunc: a Retry-After of N seconds delays the retry by N seconds."""
 
     def handle(request: httpx.Request) -> httpx.Response:
         return httpx.Response(429, headers={"Retry-After": "7"})
@@ -226,14 +213,12 @@ def test_retry_after_seconds_is_honoured(clock: FakeClock) -> None:
 
 
 def test_retry_after_is_ignored_for_other_statuses() -> None:
-    """Go consults Retry-After only on 429 and 503."""
     response = httpx.Response(500, headers={"Retry-After": "7"})
     execution = _execution_with(response)
     assert retry_after_delay(execution) == 0.0
 
 
 def test_retry_after_http_date_is_converted_to_a_delay() -> None:
-    """The header's other legal form, which Go's integer parse silently ignores."""
     import datetime
 
     when = datetime.datetime.now(tz=datetime.UTC) + datetime.timedelta(seconds=30)
@@ -361,12 +346,6 @@ def test_retry_policy_defaults_are_overridable() -> None:
 
 
 def test_the_policy_deadline_reaches_httpx() -> None:
-    """A sync Timeout bounds the round trip, not just what gets reported.
-
-    httpx cannot be interrupted mid-request, so the deadline only becomes real if the
-    transport hands it over. It goes into ``request.extensions["timeout"]``, which is
-    this transport's equivalent of the request context failsafe-go threads per attempt.
-    """
     seen: list[dict[str, float]] = []
 
     class Recording(httpx.BaseTransport):

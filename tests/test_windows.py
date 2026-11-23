@@ -1,5 +1,3 @@
-"""Rolling window primitives, ported from failsafe-go's ``internal/util`` tests."""
-
 from __future__ import annotations
 
 import math
@@ -28,7 +26,6 @@ def test_smooth_blends_towards_the_new_value() -> None:
     [(1, 3), (99, 3), (100, 6), (999, 6), (1000, 9), (10000, 12)],
 )
 def test_log10_step_scales_with_limit_magnitude(limit: int, expected: int) -> None:
-    """Go's Log10Func: one step below 100, two below 1000, log10 thereafter."""
     assert log10_step(3, limit) == expected
 
 
@@ -156,7 +153,6 @@ def test_correlation_window_is_zero_during_warmup() -> None:
 
 
 def test_correlation_window_ignores_series_that_barely_vary() -> None:
-    """Below 1% variation there is no trend to read, so Go reports no correlation."""
     window = CorrelationWindow(capacity=20, warmup_samples=3)
     correlation = 1.0
     for i in range(20):

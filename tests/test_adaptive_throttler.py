@@ -1,9 +1,3 @@
-"""Ported from failsafe-go's adaptivethrottler/adaptivethrottler_test.go.
-
-Go's probabilistic tests loop until a rejection happens, accepting a documented
-0.01% flake rate. We inject the RNG instead, so the same assertions are exact.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -34,7 +28,6 @@ def record_failures(throttler: AdaptiveThrottler, count: int) -> None:
 
 
 def test_calculates_rejection_rate_after_failures() -> None:
-    """Go: should calculate rejection rate after failures."""
     throttler = AdaptiveThrottler()
     throttler.acquire_permit()
 
@@ -46,7 +39,6 @@ def test_calculates_rejection_rate_after_failures() -> None:
 
 
 def test_raises_throttle_exceeded_when_rejected() -> None:
-    """Go loops 50 times hoping for a rejection; a draw below the rate is certain here."""
     throttler = AdaptiveThrottler(
         max_rejection_rate=1.0,
         failure_rate_threshold=0.1,
@@ -61,7 +53,6 @@ def test_raises_throttle_exceeded_when_rejected() -> None:
 
 
 def test_respects_max_rejection_rate() -> None:
-    """Go: should respect max rejection rate."""
     throttler = AdaptiveThrottler(max_rejection_rate=0.5)
     record_failures(throttler, 20)
     throttler.try_acquire_permit()
@@ -71,11 +62,6 @@ def test_respects_max_rejection_rate() -> None:
 
 
 def test_does_not_reject_below_the_execution_threshold() -> None:
-    """Go: should not reject when execution threshold is not met.
-
-    One failure leaves the throttler under the threshold of 2, so the permit is
-    granted whatever the RNG says. A second failure meets it, and the draw decides.
-    """
     throttler = AdaptiveThrottler(
         failure_rate_threshold=0.1,
         execution_threshold=2,
@@ -224,7 +210,6 @@ def test_acquire_permit_async_matches_sync() -> None:
 
 
 def test_retry_sees_throttle_rejection_as_a_failure() -> None:
-    """An outer retry may retry a rejection, as Go returns it as an ordinary error."""
     throttler = AdaptiveThrottler(
         execution_threshold=1, max_rejection_rate=1.0, rng=SequenceRandom([0.0, 0.0, 1.0])
     )
@@ -270,8 +255,6 @@ async def _async_ok() -> str:
 
 
 class TestComputeRejectionRate:
-    """Go's TestComputeRejectionRate, ported case for case."""
-
     def test_better_than_the_threshold(self) -> None:
         assert _compute_rejection_rate(100.0, 95.0, 0.9, 0.8, 1) == 0.0
 
