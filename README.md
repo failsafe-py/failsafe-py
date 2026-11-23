@@ -13,6 +13,11 @@ needed. Policies include:
 A Python port of [failsafe-go](https://github.com/failsafe-go/failsafe-go). See
 [PORT.md](PORT.md) for divergences.
 
+## Documentation
+
+- [failsafe-py.github.io](https://failsafe-py.github.io) — guides and usage
+- [failsafe-py.readthedocs.io](https://failsafe-py.readthedocs.io) — API reference
+
 ## Project status
 
 This is mostly agentic port of failsafe-go alongside its website, because I
