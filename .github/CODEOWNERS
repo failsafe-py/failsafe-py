@@ -1,0 +1,6 @@
+# Sole maintainer. Required review on paths where a merged PR could do real
+# damage: CI/release workflows can exfiltrate or publish, packaging controls
+# what ships.
+/.github/     @nicdumz
+/pyproject.toml @nicdumz
+/uv.lock      @nicdumz
