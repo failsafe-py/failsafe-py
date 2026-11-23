@@ -41,9 +41,8 @@ Python 3.11+. Ships `py.typed`.
 
 ## Documentation
 
-- **[Guides and usage](https://failsafe-py.github.io)** — how each policy behaves and how to compose them
-- **[API reference](https://failsafe-py.readthedocs.io)** — every public symbol
-- **[Porting from failsafe-go](https://github.com/failsafe-py/failsafe-py/blob/main/PORT.md)** — name mapping and deviations
+- **[Guides and usage](https://failsafe-py.github.io)**
+- **[API reference](https://failsafe-py.readthedocs.io)**
 
 ## Project status
 
